@@ -54,6 +54,8 @@ export default function OnboardingScreen() {
   const colors = Colors[colorScheme];
   const setOnboardingComplete = useUIStore((state) => state.setOnboardingComplete);
 
+  const setGuest = useAuthStore((state) => state.setGuest);
+
   const viewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
       setCurrentIndex(viewableItems[0].index);
@@ -65,6 +67,12 @@ export default function OnboardingScreen() {
   const handleFinish = () => {
     setOnboardingComplete(true);
     router.replace('/(auth)/login');
+  };
+
+  const handleSkip = () => {
+    setOnboardingComplete(true);
+    setGuest(true);
+    router.replace('/(tabs)');
   };
 
   const handleNext = () => {
@@ -90,7 +98,7 @@ export default function OnboardingScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.skipButton} onPress={handleFinish}>
+        <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
           <Text variant="body2" family="heading" style={{ color: colors.saffron }}>SKIP</Text>
         </TouchableOpacity>
       </View>
