@@ -6,9 +6,11 @@ import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { SpiceProductCard } from '@/components/spice/SpiceProductCard';
 import { SpiceCategoryCard } from '@/components/spice/SpiceCategoryCard';
-import { SpiceCarousel } from '@/components/spice/SpiceCarousel';
+import { ThreeDCarousel } from '@/components/spice/ThreeDCarousel';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeInUp, FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInUp, FadeInDown, FadeInRight, useSharedValue, useAnimatedScrollHandler } from 'react-native-reanimated';
+import { HomeHeader } from '@/components/ui/HomeHeader';
+import { SpiceJarRefresh } from '@/components/ui/SpiceJarRefresh';
 
 const { width } = Dimensions.get('window');
 
@@ -49,49 +51,42 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
+  const scrollY = useSharedValue(0);
+  const refreshProgress = useSharedValue(0);
+
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
+    if (event.contentOffset.y < 0) {
+      refreshProgress.value = Math.min(Math.abs(event.contentOffset.y) / 100, 1.2);
+    } else {
+      refreshProgress.value = 0;
+    }
+  });
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Top Bar */}
-      <View style={[styles.topBar, { backgroundColor: colors.background }]}>
-        <View style={styles.topRow}>
-          <Text variant="h2" family="display" style={{ color: colors.saffron }}>SpiceCart</Text>
-          <View style={styles.topActions}>
-            <TouchableOpacity style={styles.iconBtn}>
-              <Ionicons name="notifications-outline" size={24} color={colors.text} />
-              <View style={[styles.badge, { backgroundColor: colors.chili }]} />
-            </TouchableOpacity>
-          </View>
-        </View>
+      <HomeHeader />
 
-        <TouchableOpacity 
-          style={[styles.searchBar, { backgroundColor: colorScheme === 'light' ? '#fff' : colors.card || '#16213E' }]}
-          onPress={() => router.push('/search')}
-        >
-          <Ionicons name="search-outline" size={20} color={colors.tabIconDefault} />
-          <Text variant="body2" style={[styles.searchPlaceholder, { color: colors.tabIconDefault, marginLeft: 10 }]}>
-            Search spices...
-          </Text>
-        </TouchableOpacity>
+      <Animated.ScrollView 
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+      >
+        <SpiceJarRefresh progress={refreshProgress} />
 
-        <View style={styles.locationBar}>
-          <Ionicons name="location-outline" size={16} color={colors.saffron} />
-          <Text variant="caption" style={styles.locationText}>Delivering to Mumbai v</Text>
-        </View>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Hero Carousel */}
         <Animated.View entering={FadeIn.duration(1000)}>
-          <SpiceCarousel items={CAROUSEL_ITEMS} />
+          <ThreeDCarousel items={CAROUSEL_ITEMS} />
         </Animated.View>
 
         {/* Categories */}
-        <View style={styles.sectionHeader}>
+        <Animated.View entering={FadeInUp.delay(200)} style={styles.sectionHeader}>
           <Text variant="overline" family="badge" style={styles.sectionTitle}>CATEGORIES</Text>
-        </View>
+        </Animated.View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
           {CATEGORIES.map((category, i) => (
-            <Animated.View key={category.id} entering={FadeInUp.delay(i * 100)}>
+            <Animated.View key={category.id} entering={FadeInUp.delay(i * 100 + 400)}>
               <SpiceCategoryCard 
                 {...category} 
                 onPress={() => router.push(`/category/${category.id}`)}
@@ -101,15 +96,15 @@ export default function HomeScreen() {
         </ScrollView>
 
         {/* Trending Now */}
-        <View style={styles.sectionHeader}>
+        <Animated.View entering={FadeInUp.delay(600)} style={styles.sectionHeader}>
           <Text variant="h2" family="heading">TRENDING NOW</Text>
           <TouchableOpacity onPress={() => router.push('/explore')}>
             <Text variant="body2" family="heading" style={{ color: colors.saffron }}>See All</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
         <View style={styles.grid}>
           {TRENDING_PRODUCTS.map((product, i) => (
-            <Animated.View key={product.id} entering={FadeInDown.delay(i * 150)} style={styles.gridItem}>
+            <Animated.View key={product.id} entering={FadeInDown.delay(i * 150 + 800)} style={styles.gridItem}>
               <SpiceProductCard 
                 {...product} 
                 onPress={() => router.push(`/product/${product.id}`)}
@@ -119,42 +114,46 @@ export default function HomeScreen() {
         </View>
 
         {/* Recipe Pairings */}
-        <View style={styles.sectionHeader}>
+        <Animated.View entering={FadeInUp.delay(1000)} style={styles.sectionHeader}>
           <Text variant="h2" family="heading">RECIPE PAIRINGS</Text>
           <TouchableOpacity><Text variant="body2" style={{ color: colors.saffron }}>See All</Text></TouchableOpacity>
-        </View>
+        </Animated.View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recipeList}>
-           {[1, 2].map((id) => (
-             <TouchableOpacity key={id} style={[styles.recipeCard, { backgroundColor: colors.card || '#fff' }]}>
-                <Image source={{ uri: 'https://images.unsplash.com/photo-1596450514735-24402770edec?q=80&w=400' }} style={styles.recipeImg} />
-                <View style={styles.recipeContent}>
-                  <Text variant="body1" family="heading">Kashmiri Biryani</Text>
-                  <Text variant="caption" style={{ opacity: 0.6 }}>Essential: Saffron, Cardamom</Text>
-                  <TouchableOpacity style={[styles.recipeBtn, { backgroundColor: colors.saffron }]}>
-                    <Text variant="overline" family="badge" style={{ color: '#000' }}>GET ALL SPICES</Text>
-                  </TouchableOpacity>
-                </View>
-             </TouchableOpacity>
+           {[1, 2].map((id, i) => (
+             <Animated.View key={id} entering={FadeInRight.delay(i * 200 + 1200)}>
+               <TouchableOpacity style={[styles.recipeCard, { backgroundColor: colors.card || '#fff' }]}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1596450514735-24402770edec?q=80&w=400' }} style={styles.recipeImg} />
+                  <View style={styles.recipeContent}>
+                    <Text variant="body1" family="heading">Kashmiri Biryani</Text>
+                    <Text variant="caption" style={{ opacity: 0.6 }}>Essential: Saffron, Cardamom</Text>
+                    <TouchableOpacity style={[styles.recipeBtn, { backgroundColor: colors.saffron }]}>
+                      <Text variant="overline" family="badge" style={{ color: '#000' }}>GET ALL SPICES</Text>
+                    </TouchableOpacity>
+                  </View>
+               </TouchableOpacity>
+             </Animated.View>
            ))}
         </ScrollView>
 
         {/* Combo Packs */}
-        <View style={styles.sectionHeader}>
+        <Animated.View entering={FadeInUp.delay(1400)} style={styles.sectionHeader}>
           <Text variant="h2" family="heading">COMBO PACKS</Text>
           <TouchableOpacity><Text variant="body2" style={{ color: colors.saffron }}>See All</Text></TouchableOpacity>
-        </View>
+        </Animated.View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recipeList}>
-           {[1, 2].map((id) => (
-             <TouchableOpacity key={id} style={[styles.comboCard, { backgroundColor: colors.card || '#fff' }]}>
-                <View style={[styles.comboBadge, { backgroundColor: colors.chili }]}>
-                  <Text variant="overline" style={{ color: '#fff', fontSize: 8 }}>SAVE 20%</Text>
-                </View>
-                <Image source={{ uri: 'https://images.unsplash.com/photo-1532336414038-cf19250c5757?q=80&w=400' }} style={styles.comboImg} />
-                <View style={styles.comboContent}>
-                  <Text variant="body2" family="heading">Essential Spice Kit</Text>
-                  <Text variant="price" family="price" style={{ color: colors.saffron, fontSize: 16 }}>₹899</Text>
-                </View>
-             </TouchableOpacity>
+           {[1, 2].map((id, i) => (
+             <Animated.View key={id} entering={FadeInRight.delay(i * 200 + 1600)}>
+               <TouchableOpacity style={[styles.comboCard, { backgroundColor: colors.card || '#fff' }]}>
+                  <View style={[styles.comboBadge, { backgroundColor: colors.chili }]}>
+                    <Text variant="overline" style={{ color: '#fff', fontSize: 8 }}>SAVE 20%</Text>
+                  </View>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1532336414038-cf19250c5757?q=80&w=400' }} style={styles.comboImg} />
+                  <View style={styles.comboContent}>
+                    <Text variant="body2" family="heading">Essential Spice Kit</Text>
+                    <Text variant="price" family="price" style={{ color: colors.saffron, fontSize: 16 }}>₹899</Text>
+                  </View>
+               </TouchableOpacity>
+             </Animated.View>
            ))}
         </ScrollView>
 
@@ -166,15 +165,6 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  topBar: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 15, zIndex: 10 },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  topActions: { flexDirection: 'row' },
-  iconBtn: { padding: 8 },
-  badge: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4 },
-  searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, height: 48, borderRadius: 12, marginBottom: 10 },
-  searchPlaceholder: { fontSize: 14 },
-  locationBar: { flexDirection: 'row', alignItems: 'center' },
-  locationText: { marginLeft: 4, opacity: 0.6 },
   scrollContent: { paddingTop: 10 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 15 },
   sectionTitle: { opacity: 0.5, letterSpacing: 1.5 },
