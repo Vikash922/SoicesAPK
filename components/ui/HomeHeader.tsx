@@ -19,12 +19,14 @@ export const HomeHeader = () => {
   const [mapVisible, setMapVisible] = useState(false);
   const [coords, setCoords] = useState({ latitude: 19.076, longitude: 72.8777 });
 
+  codex/improve-animations-and-overall-performance-jzrw5e
   React.useEffect(() => {
     // Prefetch high-frequency routes for near-instant transitions.
     router.prefetch('/search/results');
     router.prefetch('/notifications');
   }, [router]);
-
+  
+    main
   const useCurrentLocation = () => {
     if (!navigator?.geolocation) return;
     navigator.geolocation.getCurrentPosition(
