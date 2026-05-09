@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/useAuthStore';
 import { TextureOverlay } from '@/components/ui/TextureOverlay';
+import { PermissionOnboardingModal } from '@/components/ui/PermissionOnboardingModal';
 
 // Font Imports
 import { PlayfairDisplay_700Bold, PlayfairDisplay_800ExtraBold } from '@expo-google-fonts/playfair-display';
@@ -93,6 +94,7 @@ export default function RootLayout() {
             <View style={{ flex: 1 }}>
               <AuthNavigator />
               <TextureOverlay />
+              <PermissionOnboardingModal />
             </View>
           </ThemeProvider>
         </FlyingCartProvider>
