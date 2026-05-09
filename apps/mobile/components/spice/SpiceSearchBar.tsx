@@ -9,12 +9,14 @@ interface SpiceSearchBarProps {
   placeholder?: string;
   onSearch: (query: string) => void;
   voiceEnabled?: boolean;
+  onVoiceSearch?: () => void;
 }
 
 export function SpiceSearchBar({
   placeholder = 'Search...',
   onSearch,
   voiceEnabled = false,
+  onVoiceSearch,
 }: SpiceSearchBarProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -64,7 +66,7 @@ export function SpiceSearchBar({
           <Ionicons name="close-circle" size={18} color={colors.tabIconDefault} />
         </TouchableOpacity>
       ) : voiceEnabled ? (
-        <TouchableOpacity style={styles.iconBtn}>
+        <TouchableOpacity style={styles.iconBtn} onPress={onVoiceSearch} accessibilityLabel="Start voice search">
           <Ionicons name="mic-outline" size={20} color={colors.tabIconDefault} />
         </TouchableOpacity>
       ) : null}

@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useProducts, useCategories } from '@/hooks/useProducts';
 import { SpiceShimmerLoader } from '@/components/spice/SpiceShimmerLoader';
+import { SpiceSearchBar } from '@/components/spice/SpiceSearchBar';
 
 const { width } = Dimensions.get('window');
 
@@ -17,6 +18,7 @@ export default function ExploreScreen() {
   const colors = Colors[colorScheme];
   const [activeFilter, setActiveFilter] = useState('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: allProducts, isLoading: isLoadingProducts } = useProducts();
   const { data: categories, isLoading: isLoadingCategories } = useCategories();
@@ -31,13 +33,13 @@ export default function ExploreScreen() {
 
   const filteredProducts = useMemo(() => {
     if (!allProducts) return [];
-    if (activeFilter === 'All') return allProducts;
-    
-    const selectedCategory = categories?.find(c => c.name === activeFilter);
-    if (!selectedCategory) return allProducts;
-    
-    return allProducts.filter(p => p.category_id === selectedCategory.id);
-  }, [allProducts, activeFilter, categories]);
+    const searchLower = searchQuery.trim().toLowerCase();
+    const base = activeFilter === 'All'
+      ? allProducts
+      : allProducts.filter((p) => p.category_id === categories?.find((c) => c.name === activeFilter)?.id);
+    if (!searchLower) return base;
+    return base.filter((p) => p.name.toLowerCase().includes(searchLower));
+  }, [allProducts, activeFilter, categories, searchQuery]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -53,6 +55,9 @@ export default function ExploreScreen() {
       </View>
 
       {/* Filter Chips */}
+      <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+        <SpiceSearchBar placeholder="Search spices..." onSearch={setSearchQuery} voiceEnabled />
+      </View>
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterList}>
           {filters.map((filter) => (

@@ -10,3 +10,4 @@ export * from './FlipClock';
 export * from './FlyingCartProvider';
 export * from './HomeHeader';
 export * from './SpiceJarRefresh';
+export * from './motion';
