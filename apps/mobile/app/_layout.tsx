@@ -17,6 +17,7 @@ import { Inter_400Regular, Inter_500Medium } from '@expo-google-fonts/inter';
 import { DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import { SpaceGrotesk_600SemiBold } from '@expo-google-fonts/space-grotesk';
 import { FlyingCartProvider } from '@/components/ui/FlyingCartProvider';
+import { PermissionOnboardingModal } from '@/components/ui/PermissionOnboardingModal';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -65,6 +66,7 @@ export default function RootLayout() {
             <Stack>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             </Stack>
+            <PermissionOnboardingModal />
           </ThemeProvider>
         </FlyingCartProvider>
       </QueryClientProvider>
