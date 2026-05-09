@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, FlatList, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { StyleSheet, View, FlatList, Platform } from 'react-native';
 import { Text } from '@/components/Themed';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -7,31 +7,36 @@ import { SpiceProductCard } from '@/components/spice/SpiceProductCard';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/ui/Button';
-
-const INITIAL_WISHLIST = [
-  { id: '3', name: 'Black Pepper (100g)', image: 'https://images.unsplash.com/photo-1532336414038-cf19250c5757?q=80&w=400', price: 189, originalPrice: 229, rating: 4.7 },
-  { id: '4', name: 'Green Cardamom (50g)', image: 'https://images.unsplash.com/photo-1596450514735-24402770edec?q=80&w=400', price: 249, originalPrice: 299, rating: 4.9 },
-];
+import { useWishlistStore } from '@/store/useWishlistStore';
+import { useCartStore } from '@/store/useCartStore';
+import LottieView from 'lottie-react-native';
+import Animated, { FadeInUp, Layout } from 'react-native-reanimated';
 
 export default function WishlistScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-  const [items, setItems] = useState(INITIAL_WISHLIST);
+  
+  const { items, toggleItem } = useWishlistStore();
+  const { addItem } = useCartStore();
 
-  const toggleWishlist = (id: string) => {
-    setItems(prev => prev.filter(item => item.id !== id));
+  const handleMoveToCart = (item: any) => {
+    addItem({ ...item, qty: 1 });
+    toggleItem(item); // Remove from wishlist
   };
 
   if (items.length === 0) {
     return (
       <View style={[styles.container, styles.emptyContainer, { backgroundColor: colors.background }]}>
-        <View style={[styles.emptyIconContainer, { backgroundColor: colors.chili + '11' }]}>
-          <Ionicons name="heart-outline" size={60} color={colors.chili} />
-        </View>
+        <LottieView 
+          source={require('@/assets/lottie/empty_jar.json')} 
+          autoPlay 
+          loop 
+          style={styles.emptyLottie} 
+        />
         <Text variant="h2" family="heading" style={styles.emptyTitle}>Your wishlist is empty</Text>
         <Text variant="body2" style={styles.emptySubtitle}>
-          Save items you love to find them easily later and get notified of price drops!
+          Save spices you love to find them easily later and get notified of price drops!
         </Text>
         <Button title="DISCOVER SPICES" onPress={() => router.replace('/(tabs)/explore')} style={styles.discoverBtn} />
       </View>
@@ -42,21 +47,33 @@ export default function WishlistScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.background }]}>
         <Text variant="h1" family="heading">Wishlist</Text>
-        <Text variant="caption" style={{ opacity: 0.6 }}>{items.length} items</Text>
+        <View style={[styles.badgeCount, { backgroundColor: colors.saffron + '20' }]}>
+          <Text variant="caption" family="heading" style={{ color: colors.saffron }}>{items.length} items</Text>
+        </View>
       </View>
 
       <FlatList
         data={items}
         numColumns={2}
-        renderItem={({ item }) => (
-          <View style={styles.gridItem}>
+        renderItem={({ item, index }) => (
+          <Animated.View 
+            entering={FadeInUp.delay(index * 100)} 
+            layout={Layout.springify()}
+            style={styles.gridItem}
+          >
             <SpiceProductCard 
-              {...item} 
+              id={item.id}
+              name={item.name}
+              image={item.image}
+              price={item.price}
+              rating={item.rating || 4.5}
+              index={index}
               isWishlisted={true}
-              onToggleWishlist={() => toggleWishlist(item.id)}
+              onToggleWishlist={() => toggleItem(item)}
+              onAddToCart={() => handleMoveToCart(item)}
               onPress={() => router.push(`/product/${item.id}`)}
             />
-          </View>
+          </Animated.View>
         )}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -69,17 +86,18 @@ export default function WishlistScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { 
-    paddingTop: 60, 
+    paddingTop: Platform.OS === 'ios' ? 60 : 40, 
     paddingHorizontal: 20, 
     paddingBottom: 15,
     flexDirection: 'row', 
     justifyContent: 'space-between', 
-    alignItems: 'baseline' 
+    alignItems: 'center' 
   },
+  badgeCount: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
   listContent: { paddingHorizontal: 10, paddingBottom: 100 },
   gridItem: { width: '50%', padding: 5 },
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  emptyIconContainer: { width: 120, height: 120, borderRadius: 60, alignItems: 'center', justifyContent: 'center', marginBottom: 25 },
+  emptyLottie: { width: 250, height: 250, marginBottom: -20 },
   emptyTitle: { marginBottom: 10 },
   emptySubtitle: { textAlign: 'center', opacity: 0.6, lineHeight: 22, marginBottom: 30 },
   discoverBtn: { width: '100%' },

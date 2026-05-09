@@ -1,0 +1,14 @@
+{
+  "name": "@spicecart/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "dependencies": {
+    "@spicecart/shared": "workspace:*",
+    "@spicecart/ui": "workspace:*",
+    "expo": "~50.0.0",
+    "expo-router": "~3.4.0",
+    "react": "18.2.0",
+    "react-native": "0.73.4"
+  }
+}

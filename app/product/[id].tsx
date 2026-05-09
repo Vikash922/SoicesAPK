@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, View as DefaultView } from 'react-native';
+import { StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, View as DefaultView, ActivityIndicator } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import Colors from '@/constants/Colors';
@@ -15,65 +15,70 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCartStore } from '@/store/useCartStore';
 import { useWishlistStore } from '@/store/useWishlistStore';
+import { useProduct, useReviews, useCommunityRecipes } from '@/hooks/useProducts';
+import { SpiceShimmerLoader } from '@/components/spice/SpiceShimmerLoader';
 
-const { width } = Dimensions.get('window');
-
-const PRODUCT_MOCK = {
-  id: '1',
-  name: 'Kashmiri Saffron (Premium)',
-  brand: 'SpiceCart Select',
-  rating: 4.8,
-  reviewCount: 2847,
-  price: 499,
-  originalPrice: 699,
-  origin: 'Kashmir, India',
-  heatLevel: 2, // 1-10 scale
-  description: 'Hand-picked from the fields of Pampore, our Kashmiri Saffron is world-renowned for its deep red color, strong aroma, and superior flavor. Each thread is carefully selected to ensure the highest quality.',
-  images: [
-    'https://images.unsplash.com/photo-1599590984817-0dc18393593e?q=80&w=800',
-    'https://images.unsplash.com/photo-1615485290382-441e4d0c9cb5?q=80&w=800',
-  ],
-  variants: ['1g', '2g', '5g', '10g'],
-  nutrition: [
-    { label: 'Calories', value: '310 kcal' },
-    { label: 'Fiber', value: '3.9g' },
-    { label: 'Iron', value: '11.1mg' },
-    { label: 'Vit A', value: '530 IU' },
-  ],
-  recipes: [
-    { id: '1', name: 'Saffron Rice', image: 'https://images.unsplash.com/photo-1596450514735-24402770edec?q=80&w=300' },
-    { id: '2', name: 'Kashmiri Kahwa', image: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=300' },
-  ]
-};
+const { width, height } = Dimensions.get('window');
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
-  const [selectedVariant, setSelectedVariant] = React.useState('1g');
+  const [selectedVariant, setSelectedVariant] = React.useState('100g');
 
+  const { data: product, isLoading } = useProduct(id as string);
+  const { data: reviews, isLoading: isLoadingReviews } = useReviews(id as string);
+  const { data: communityRecipes, isLoading: isLoadingRecipes } = useCommunityRecipes(id as string);
+  
   const addItem = useCartStore((state) => state.addItem);
   const toggleWishlist = useWishlistStore((state) => state.toggleItem);
-  const isInWishlist = useWishlistStore((state) => state.isInWishlist(PRODUCT_MOCK.id));
+  const isInWishlist = useWishlistStore((state) => state.isInWishlist(id as string));
 
   // Heat Meter Animation
   const heatProgress = useSharedValue(0);
 
   useEffect(() => {
-    heatProgress.value = withTiming(PRODUCT_MOCK.heatLevel / 10, { duration: 1500 });
-  }, []);
+    if (product) {
+      heatProgress.value = withTiming((product.spice_heat_level || 0) / 10, { duration: 1500 });
+    }
+  }, [product]);
 
   const heatIndicatorStyle = useAnimatedStyle(() => ({
     left: `${heatProgress.value * 100}%`,
   }));
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <SpiceShimmerLoader variant="banner" style={{ height: width, width: width }} />
+        <View style={{ padding: 20 }}>
+          <SpiceShimmerLoader variant="list" />
+          <SpiceShimmerLoader variant="list" />
+          <SpiceShimmerLoader variant="list" />
+        </View>
+      </View>
+    );
+  }
+
+  if (!product) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
+        <Text>Product not found</Text>
+        <Button title="Go Back" onPress={() => router.back()} />
+      </View>
+    );
+  }
+
+  const images = product.images && product.images.length > 0 ? product.images : [product.image];
+  const discount = product.original_price ? Math.round(((product.original_price - product.price) / product.original_price) * 100) : 0;
+
   const handleAddToCart = () => {
     addItem({
-      id: PRODUCT_MOCK.id,
-      name: PRODUCT_MOCK.name,
-      image: PRODUCT_MOCK.images[0],
-      price: PRODUCT_MOCK.price,
+      id: product.id,
+      name: product.name,
+      image: product.image,
+      price: product.price,
       qty: 1,
       variant: selectedVariant
     });
@@ -82,11 +87,11 @@ export default function ProductDetailScreen() {
 
   const handleWishlist = () => {
     toggleWishlist({
-      id: PRODUCT_MOCK.id,
-      name: PRODUCT_MOCK.name,
-      image: PRODUCT_MOCK.images[0],
-      price: PRODUCT_MOCK.price,
-      rating: PRODUCT_MOCK.rating
+      id: product.id,
+      name: product.name,
+      image: product.image,
+      price: product.price,
+      rating: product.avg_rating
     });
   };
 
@@ -94,7 +99,7 @@ export default function ProductDetailScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen 
         options={{
-          headerTitle: 'Product Details',
+          headerTitle: product.name,
           headerTransparent: true,
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
@@ -123,38 +128,46 @@ export default function ProductDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Image Gallery */}
         <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-          {PRODUCT_MOCK.images.map((img, index) => (
+          {images.map((img, index) => (
             <Image key={index} source={{ uri: img }} style={styles.heroImage} />
           ))}
         </ScrollView>
 
         <View style={styles.content}>
           <View style={styles.badgeRow}>
-            <View style={[styles.badge, { backgroundColor: colors.cardamom + '20' }]}>
-              <Ionicons name="leaf-outline" size={14} color={colors.cardamom} />
-              <Text variant="overline" family="badge" style={{ color: colors.cardamom, marginLeft: 4 }}>ORGANIC</Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: colors.saffron + '20', marginLeft: 8 }]}>
-              <Ionicons name="ribbon-outline" size={14} color={colors.saffron} />
-              <Text variant="overline" family="badge" style={{ color: colors.saffron, marginLeft: 4 }}>PREMIUM</Text>
-            </View>
+            {product.is_organic && (
+              <View style={[styles.badge, { backgroundColor: colors.cardamom + '20' }]}>
+                <Ionicons name="leaf-outline" size={14} color={colors.cardamom} />
+                <Text variant="overline" family="badge" style={{ color: colors.cardamom, marginLeft: 4 }}>ORGANIC</Text>
+              </View>
+            )}
+            {product.is_premium && (
+              <View style={[styles.badge, { backgroundColor: colors.saffron + '20', marginLeft: 8 }]}>
+                <Ionicons name="ribbon-outline" size={14} color={colors.saffron} />
+                <Text variant="overline" family="badge" style={{ color: colors.saffron, marginLeft: 4 }}>PREMIUM</Text>
+              </View>
+            )}
           </View>
 
-          <Text variant="h1" family="heading" style={styles.name}>{PRODUCT_MOCK.name}</Text>
-          <Text variant="body2" style={styles.brand}>by {PRODUCT_MOCK.brand}</Text>
+          <Text variant="h1" family="heading" style={styles.name}>{product.name}</Text>
+          <Text variant="body2" style={styles.brand}>SpiceCart Premium Collection</Text>
 
           <View style={styles.ratingRow}>
             <Ionicons name="star" size={16} color={colors.turmeric} />
-            <Text variant="body2" family="heading" style={{ marginLeft: 4 }}>{PRODUCT_MOCK.rating}</Text>
-            <Text variant="caption" style={{ opacity: 0.5, marginLeft: 4 }}>({PRODUCT_MOCK.reviewCount} reviews)</Text>
+            <Text variant="body2" family="heading" style={{ marginLeft: 4 }}>{product.avg_rating || 0}</Text>
+            <Text variant="caption" style={{ opacity: 0.5, marginLeft: 4 }}>({product.review_count || 0} reviews)</Text>
           </View>
 
           <View style={styles.priceRow}>
-            <Text variant="display2" family="price">₹{PRODUCT_MOCK.price}</Text>
-            <Text variant="body1" style={styles.originalPrice}>₹{PRODUCT_MOCK.originalPrice}</Text>
-            <View style={[styles.discountBadge, { backgroundColor: colors.chili }]}>
-              <Text variant="overline" family="badge" style={{ color: '#fff' }}>30% OFF</Text>
-            </View>
+            <Text variant="display2" family="price">₹{product.price}</Text>
+            {product.original_price && (
+              <>
+                <Text variant="body1" style={styles.originalPrice}>₹{product.original_price}</Text>
+                <View style={[styles.discountBadge, { backgroundColor: colors.chili }]}>
+                  <Text variant="overline" family="badge" style={{ color: '#fff' }}>{discount}% OFF</Text>
+                </View>
+              </>
+            )}
           </View>
 
           <View style={styles.divider} />
@@ -163,7 +176,7 @@ export default function ProductDetailScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
               <Text variant="body2" family="heading">SPICE HEAT METER</Text>
-              <Text variant="body2" style={{ color: colors.chili }}>{PRODUCT_MOCK.heatLevel}/10</Text>
+              <Text variant="body2" style={{ color: colors.chili }}>{product.spice_heat_level}/10</Text>
             </View>
             <View style={styles.heatMeterContainer}>
               <LinearGradient
@@ -187,7 +200,7 @@ export default function ProductDetailScreen() {
           <View style={styles.section}>
             <Text variant="body2" family="heading" style={styles.sectionTitle}>SELECT SIZE</Text>
             <View style={styles.variantContainer}>
-              {PRODUCT_MOCK.variants.map((v) => (
+              {['50g', '100g', '250g', '500g'].map((v) => (
                 <TouchableOpacity 
                   key={v} 
                   onPress={() => setSelectedVariant(v)}
@@ -207,7 +220,7 @@ export default function ProductDetailScreen() {
             <View style={styles.infoItem}>
               <Ionicons name="location-outline" size={20} color={colors.saffron} />
               <Text variant="caption" style={styles.infoLabel}>Origin</Text>
-              <Text variant="body2" family="heading">{PRODUCT_MOCK.origin}</Text>
+              <Text variant="body2" family="heading">{product.origin_country}{product.region ? `, ${product.region}` : ''}</Text>
             </View>
             <View style={styles.infoItem}>
               <Ionicons name="shield-checkmark-outline" size={20} color={colors.cardamom} />
@@ -217,34 +230,111 @@ export default function ProductDetailScreen() {
           </View>
 
           {/* Nutrition Section */}
-          <View style={[styles.section, styles.nutritionSection, { backgroundColor: colors.card + '30' }]}>
-             <Text variant="body2" family="heading" style={styles.sectionTitle}>NUTRITION FACTS (per 100g)</Text>
-             <View style={styles.nutritionGrid}>
-                {PRODUCT_MOCK.nutrition.map((item) => (
-                  <View key={item.label} style={styles.nutritionItem}>
-                     <Text variant="caption" style={{ opacity: 0.6 }}>{item.label}</Text>
-                     <Text variant="body2" family="heading">{item.value}</Text>
-                  </View>
-                ))}
-             </View>
-          </View>
+          {product.nutrition_info && product.nutrition_info.length > 0 && (
+            <View style={[styles.section, styles.nutritionSection, { backgroundColor: colors.card + '30' }]}>
+               <Text variant="body2" family="heading" style={styles.sectionTitle}>NUTRITION FACTS (per 100g)</Text>
+               <View style={styles.nutritionGrid}>
+                  {product.nutrition_info.map((item) => (
+                    <View key={item.label} style={styles.nutritionItem}>
+                       <Text variant="caption" style={{ opacity: 0.6 }}>{item.label}</Text>
+                       <Text variant="body2" family="heading">{item.value}</Text>
+                    </View>
+                  ))}
+               </View>
+            </View>
+          )}
 
           <View style={styles.section}>
             <Text variant="body2" family="heading" style={styles.sectionTitle}>DESCRIPTION</Text>
-            <Text variant="body2" style={styles.description}>{PRODUCT_MOCK.description}</Text>
+            <Text variant="body2" style={styles.description}>{product.description}</Text>
           </View>
 
-          {/* Recipe Pairings */}
+          {product.storage_tips && (
+            <View style={styles.section}>
+              <Text variant="body2" family="heading" style={styles.sectionTitle}>STORAGE TIPS</Text>
+              <Text variant="body2" style={styles.description}>{product.storage_tips}</Text>
+            </View>
+          )}
+
+          {/* Community Recipes */}
           <View style={styles.section}>
-            <Text variant="body2" family="heading" style={styles.sectionTitle}>RECIPES USING THIS</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recipeList}>
-              {PRODUCT_MOCK.recipes.map((recipe) => (
-                <TouchableOpacity key={recipe.id} style={styles.recipeCard} onPress={() => router.push(`/recipe/${recipe.id}`)}>
-                  <Image source={{ uri: recipe.image }} style={styles.recipeImg} />
-                  <Text variant="caption" family="heading" style={styles.recipeName}>{recipe.name}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.sectionHeaderRow}>
+              <Text variant="body2" family="heading" style={styles.sectionTitle}>COMMUNITY RECIPES</Text>
+              <TouchableOpacity><Text variant="caption" style={{ color: colors.saffron }}>View All</Text></TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 20 }}>
+              {isLoadingRecipes ? (
+                [1,2].map(i => <SpiceShimmerLoader key={i} variant="card" style={{ width: 140, height: 140, marginRight: 15 }} />)
+              ) : communityRecipes && communityRecipes.length > 0 ? (
+                communityRecipes.map((recipe) => (
+                  <View key={recipe.id} style={styles.communityCard}>
+                    <Image source={{ uri: recipe.image_url }} style={styles.communityImg} />
+                    <View style={[styles.communityUserRow, { backgroundColor: 'transparent' }]}>
+                      <Image source={{ uri: recipe.profiles?.avatar_url }} style={styles.communityAvatar} />
+                      <Text variant="caption" family="heading" style={{ marginLeft: 6, color: '#fff' }}>{recipe.profiles?.full_name.split(' ')[0]}</Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text variant="caption" style={{ opacity: 0.5, marginVertical: 20 }}>Be the first to share a recipe!</Text>
+              )}
+              <TouchableOpacity style={[styles.addRecipeCard, { borderColor: colors.tabIconDefault + '40', borderStyle: 'dashed', borderWidth: 1 }]}>
+                <Ionicons name="camera-outline" size={24} color={colors.saffron} />
+                <Text variant="caption" style={{ marginTop: 8, color: colors.saffron, textAlign: 'center' }}>Share your{'\n'}creation</Text>
+              </TouchableOpacity>
             </ScrollView>
+          </View>
+
+          {/* Ratings & Reviews */}
+          <View style={styles.section}>
+            <Text variant="body2" family="heading" style={styles.sectionTitle}>RATINGS & REVIEWS</Text>
+            
+            <View style={styles.ratingSummary}>
+              <View style={styles.ratingSummaryLeft}>
+                <Text variant="display1" family="heading">{product.avg_rating || '0.0'}</Text>
+                <View style={{ flexDirection: 'row', marginVertical: 4, backgroundColor: 'transparent' }}>
+                  {[1,2,3,4,5].map(i => <Ionicons key={i} name="star" size={14} color={i <= Math.round(product.avg_rating || 0) ? colors.turmeric : colors.tabIconDefault + '44'} />)}
+                </View>
+                <Text variant="caption" style={{ opacity: 0.6 }}>{product.review_count || '0'} Reviews</Text>
+              </View>
+              
+              <View style={styles.ratingBars}>
+                {[5, 4, 3, 2, 1].map((star, i) => {
+                  const percent = product.review_count ? Math.random() * 100 : 0;
+                  return (
+                    <View key={star} style={styles.ratingBarRow}>
+                      <Text variant="caption" style={styles.starText}>{star} <Ionicons name="star" size={10} /></Text>
+                      <View style={[styles.ratingBarBg, { backgroundColor: colors.tabIconDefault + '20' }]}>
+                        <View style={[styles.ratingBarFill, { width: `${percent}%`, backgroundColor: colors.turmeric }]} />
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+
+            {isLoadingReviews ? (
+              <ActivityIndicator color={colors.saffron} />
+            ) : reviews && reviews.length > 0 ? (
+              reviews.map((review) => (
+                <View key={review.id} style={styles.reviewItem}>
+                  <View style={styles.reviewHeader}>
+                    <Image source={{ uri: review.profiles?.avatar_url }} style={styles.reviewerAvatar} />
+                    <View style={{ marginLeft: 10 }}>
+                      <Text variant="body2" family="heading">{review.profiles?.full_name}</Text>
+                      <View style={{ flexDirection: 'row', backgroundColor: 'transparent' }}>
+                        {[1,2,3,4,5].map(i => <Ionicons key={i} name="star" size={10} color={i <= review.rating ? colors.turmeric : colors.tabIconDefault + '44'} />)}
+                      </View>
+                    </View>
+                    <Text variant="caption" style={{ marginLeft: 'auto', opacity: 0.5 }}>{new Date(review.created_at).toLocaleDateString()}</Text>
+                  </View>
+                  <Text variant="body2" style={{ opacity: 0.8, lineHeight: 20 }}>{review.comment}</Text>
+                </View>
+              ))
+            ) : (
+              <Text variant="caption" style={{ opacity: 0.5, textAlign: 'center', marginVertical: 20 }}>No reviews yet.</Text>
+            )}
+
           </View>
 
           <View style={{ height: 120 }} />
@@ -263,9 +353,11 @@ export default function ProductDetailScreen() {
           />
         </View>
         <Button 
-          title={`ADD TO CART • ₹${PRODUCT_MOCK.price}`} 
+          title={product.is_out_of_stock ? "OUT OF STOCK" : `ADD TO CART • ₹${product.price}`} 
           onPress={handleAddToCart} 
           style={styles.addToCartBtn}
+          disabled={product.is_out_of_stock}
+          variant={product.is_out_of_stock ? "outline" : "primary"}
         />
       </View>
     </View>
@@ -302,10 +394,21 @@ const styles = StyleSheet.create({
   nutritionGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   nutritionItem: { width: '50%', marginBottom: 12 },
   description: { lineHeight: 22, opacity: 0.8 },
-  recipeList: { backgroundColor: 'transparent' },
-  recipeCard: { width: 120, marginRight: 16 },
-  recipeImg: { width: 120, height: 120, borderRadius: 12, marginBottom: 8 },
-  recipeName: { textAlign: 'center' },
+  communityCard: { width: 140, marginRight: 15, borderRadius: 16, overflow: 'hidden' },
+  communityImg: { width: 140, height: 140, borderRadius: 16 },
+  communityUserRow: { position: 'absolute', bottom: 10, left: 10, flexDirection: 'row', alignItems: 'center' },
+  communityAvatar: { width: 20, height: 20, borderRadius: 10 },
+  addRecipeCard: { width: 140, height: 140, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  ratingSummary: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, backgroundColor: 'transparent' },
+  ratingSummaryLeft: { alignItems: 'center', marginRight: 20, backgroundColor: 'transparent' },
+  ratingBars: { flex: 1, backgroundColor: 'transparent' },
+  ratingBarRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, backgroundColor: 'transparent' },
+  starText: { width: 20, fontSize: 10, opacity: 0.6 },
+  ratingBarBg: { flex: 1, height: 6, borderRadius: 3, marginLeft: 8 },
+  ratingBarFill: { height: '100%', borderRadius: 3 },
+  reviewItem: { marginBottom: 20, backgroundColor: 'transparent' },
+  reviewHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, backgroundColor: 'transparent' },
+  reviewerAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   stickyBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingBottom: 40, flexDirection: 'row', borderTopWidth: 1 },
   wishlistBtn: { width: 56, height: 56, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   addToCartBtn: { flex: 1, height: 56 },

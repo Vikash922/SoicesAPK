@@ -1,11 +1,16 @@
 import React from 'react';
-import { StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, View } from '../Themed';
 import { Card } from '../ui/Card';
+import { SpiceImage } from './SpiceImage';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '../useColorScheme';
 import { Ionicons } from '@expo/vector-icons';
 import { AnimatedHeart } from '../ui/AnimatedHeart';
+import { useFlyingCart } from '../ui/FlyingCartProvider';
+import { MotiView } from 'moti';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
+import * as Haptics from 'expo-haptics';
 
 interface SpiceProductCardProps {
   id: string;
@@ -14,74 +19,131 @@ interface SpiceProductCardProps {
   price: number;
   originalPrice?: number;
   rating: number;
+  isOutOfStock?: boolean;
+  style?: any;
+  variant?: 'grid' | 'list';
+  layout?: string;
   onPress?: () => void;
   onAddToCart?: () => void;
   onToggleWishlist?: () => void;
   isWishlisted?: boolean;
+  index?: number;
 }
 
 export function SpiceProductCard({
+  id,
   name,
   image,
   price,
   originalPrice,
   rating,
+  isOutOfStock = false,
+  style,
+  variant = 'grid',
+  layout,
   onPress,
   onAddToCart,
   onToggleWishlist,
   isWishlisted = false,
+  index = 0,
 }: SpiceProductCardProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const { trigger } = useFlyingCart();
+  const reducedMotion = useReducedMotion();
 
+  const isList = variant === 'list';
   const discount = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
 
+  const handleAddToCart = (e: any) => {
+    if (isOutOfStock) return;
+    if (onAddToCart) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      onAddToCart();
+      trigger(image, { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
+    }
+  };
+
+  const handleToggleWishlist = () => {
+    if (onToggleWishlist) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onToggleWishlist();
+    }
+  };
+
   return (
-    <Card style={styles.container}>
-      <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
-        <View style={styles.imageContainer}>
-          <Image source={{ uri: image }} style={styles.image} />
-          {discount > 0 && (
-            <View style={[styles.discountBadge, { backgroundColor: colors.chili }]}>
-              <Text style={styles.discountText}>{discount}% OFF</Text>
-            </View>
-          )}
-          <View style={styles.wishlistButton}>
-            <AnimatedHeart 
-              isLiked={isWishlisted} 
-              onPress={onToggleWishlist || (() => {})} 
-              size={18}
-              activeColor={colors.chili}
-              inactiveColor={colors.text}
-            />
+    <MotiView
+      from={{ opacity: 0, translateY: 20 }}
+      animate={{ opacity: 1, translateY: 0 }}
+      transition={{ type: 'timing', duration: 400, delay: index * 100 }}
+      style={[styles.container, isList && styles.containerHorizontal, style]}
+    >
+      <Card style={{ flex: 1, padding: 0 }}>
+        <TouchableOpacity 
+          onPress={onPress} 
+          activeOpacity={0.9} 
+          style={isList ? styles.touchableHorizontal : {}}
+          accessibilityLabel={`${name}, ${rating} stars, ₹${price}`}
+          accessibilityRole="button"
+          accessibilityHint="Goes to product detail page"
+        >
+          <View style={[styles.imageContainer, isList && styles.imageContainerHorizontal, isOutOfStock && { opacity: 0.6 }]}>
+            <SpiceImage source={{ uri: image }} style={styles.image} />
+            {discount > 0 && !isOutOfStock && (
+              <View style={[styles.discountBadge, { backgroundColor: colors.chili }]}>
+                <Text style={styles.discountText}>{discount}% OFF</Text>
+              </View>
+            )}
+            {isOutOfStock && (
+              <View style={[styles.outOfStockBadge, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+                <Text style={styles.outOfStockText}>OUT OF STOCK</Text>
+              </View>
+            )}
           </View>
-        </View>
 
-        <View style={styles.content}>
-          <Text numberOfLines={1} variant="h3" family="heading" style={styles.name}>{name}</Text>
-          
-          <View style={styles.ratingRow}>
-            <Ionicons name="star" size={14} color={colors.turmeric} />
-            <Text variant="caption" style={styles.ratingText}>{rating}</Text>
-          </View>
-
-          <View style={styles.priceRow}>
-            <View style={styles.priceContainer}>
-              <Text variant="price" family="price" style={styles.price}>₹{price}</Text>
-              {originalPrice && (
-                <Text variant="strike" style={styles.originalPrice}>₹{originalPrice}</Text>
-              )}
+          <View style={[styles.content, isList && styles.contentHorizontal]}>
+            <View style={{ backgroundColor: 'transparent' }}>
+              <Text numberOfLines={2} variant="h3" family="heading" style={styles.name}>{name}</Text>
+              
+              <View style={styles.ratingRow}>
+                <Ionicons name="star" size={14} color={colors.turmeric} />
+                <Text variant="caption" style={styles.ratingText}>{rating}</Text>
+              </View>
             </View>
-            <TouchableOpacity 
-              style={[styles.addButton, { backgroundColor: colors.saffron }]}
-              onPress={onAddToCart}
-            >
-              <Ionicons name="cart-outline" size={18} color="#000" />
-            </TouchableOpacity>
+
+            <View style={[styles.priceRow, isList && styles.priceRowHorizontal]}>
+              <View style={styles.priceContainer}>
+                <Text variant="price" family="price" style={styles.price}>₹{price}</Text>
+                {originalPrice && (
+                  <Text variant="strike" style={styles.originalPrice}>₹{originalPrice}</Text>
+                )}
+              </View>
+              <View style={styles.actionButtons}>
+                <View style={styles.wishlistButtonMinimal}>
+                  <AnimatedHeart 
+                    isLiked={isWishlisted} 
+                    onPress={handleToggleWishlist} 
+                    size={24}
+                    activeColor={colors.chili}
+                    inactiveColor={colors.text}
+                    accessibilityLabel={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+                  />
+                </View>
+                <TouchableOpacity 
+                  style={[styles.addButton, { backgroundColor: isOutOfStock ? colors.tabIconDefault : colors.saffron }]}
+                  onPress={handleAddToCart}
+                  disabled={isOutOfStock}
+                  accessibilityLabel={isOutOfStock ? "Out of stock" : `Add ${name} to cart`}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name={isOutOfStock ? "close-circle-outline" : "cart-outline"} size={20} color={isOutOfStock ? "#fff" : "#000"} />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
-    </Card>
+        </TouchableOpacity>
+      </Card>
+    </MotiView>
   );
 }
 
@@ -90,17 +152,29 @@ const styles = StyleSheet.create({
     width: '100%',
     padding: 8,
   },
+  containerHorizontal: {
+    padding: 10,
+  },
+  touchableHorizontal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
   imageContainer: {
     width: '100%',
     aspectRatio: 1,
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#f5f5f5',
+  },
+  imageContainerHorizontal: {
+    width: 100,
+    height: 100,
+    aspectRatio: undefined,
   },
   image: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
   discountBadge: {
     position: 'absolute',
@@ -115,20 +189,38 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
-  wishlistButton: {
+  outOfStockBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outOfStockText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  wishlistButtonMinimal: {
+    marginRight: 12,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: {
     marginTop: 8,
     backgroundColor: 'transparent',
+  },
+  contentHorizontal: {
+    flex: 1,
+    marginTop: 0,
+    marginLeft: 15,
+    justifyContent: 'space-between',
+    height: 100,
   },
   name: {
     fontWeight: '600',
@@ -150,6 +242,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     backgroundColor: 'transparent',
   },
+  priceRowHorizontal: {
+    marginTop: 0,
+  },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -163,10 +258,15 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     opacity: 0.5,
   },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
   addButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44, // WCAG 44x44
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },

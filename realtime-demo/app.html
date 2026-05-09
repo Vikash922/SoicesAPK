@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpiceCart - Shop Realtime</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #f97316;
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text-dark: #0f172a;
+            --text-light: #64748b;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 20px;
+        }
+        header {
+            max-width: 1200px;
+            margin: 0 auto 40px;
+            text-align: center;
+        }
+        h1 { color: var(--primary); font-size: 2.5rem; margin-bottom: 8px; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .product-card {
+            background: var(--card);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+        .product-card:hover { transform: translateY(-8px); }
+        .product-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: #f8fafc;
+        }
+        .product-info { padding: 20px; }
+        .product-name { font-size: 1.25rem; font-weight: 700; margin: 0 0 8px; }
+        .product-price { color: var(--primary); font-size: 1.5rem; font-weight: 800; }
+        .no-products {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px;
+            background: white;
+            border-radius: 16px;
+            color: var(--text-light);
+            font-size: 1.2rem;
+        }
+        .badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div id="connectionStatus" style="position:fixed; top:20px; right:20px; background:#fff; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:flex; align-items:center; z-index:1000;">
+            <span style="width:8px; height:8px; background:#22c55e; border-radius:50%; margin-right:8px; display:inline-block;"></span>
+            CONNECTED
+        </div>
+        <h1>SpiceCart</h1>
+        <p>Experience Realtime Spice Shopping</p>
+    </header>
+
+    <div id="productGrid" class="grid">
+        <div class="no-products">Loading products...</div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://esumzafpfancrskftqjw.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzdW16YWZwZmFuY3Jza2Z0cWp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODc5NjIsImV4cCI6MjA5MzU2Mzk2Mn0.4eBmoewsuYJd4gpnO5gxrfOVs9Uci7AYzJKmZLu0_eY";
+        const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        const grid = document.getElementById('productGrid');
+        let products = [];
+
+        async function init() {
+            if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+                await Notification.requestPermission();
+            }
+            await fetchProducts();
+            setupRealtime();
+        }
+
+        async function fetchProducts() {
+            const { data, error } = await client
+                .from('products')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error("Fetch error:", error);
+                grid.innerHTML = `<div class="no-products">Error loading products. Check console.</div>`;
+                return;
+            }
+
+            products = data;
+            renderProducts();
+        }
+
+        function renderProducts() {
+            if (products.length === 0) {
+                grid.innerHTML = `<div class="no-products">No products available</div>`;
+                return;
+            }
+
+            grid.innerHTML = products.map(p => `
+                <div class="product-card" id="prod-${p.id}">
+                    <img src="${p.image || 'https://via.placeholder.com/400x300?text=No+Image'}" class="product-image" alt="${p.name}">
+                    <div class="product-info">
+                        <h3 class="product-name">${p.name}</h3>
+                        <div class="product-price">$${parseFloat(p.price).toFixed(2)}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setupRealtime() {
+            client
+                .channel('schema-db-changes')
+                .on('postgres_changes', 
+                    { event: '*', schema: 'public', table: 'products' }, 
+                    (payload) => {
+                        if (payload.eventType === 'INSERT') {
+                            const newProduct = payload.new;
+                            products.unshift(newProduct);
+                            showNotification(newProduct);
+                        } else if (payload.eventType === 'DELETE') {
+                            products = products.filter(p => p.id !== payload.old.id);
+                        } else if (payload.eventType === 'UPDATE') {
+                            const index = products.findIndex(p => p.id === payload.new.id);
+                            if (index !== -1) {
+                                products[index] = payload.new;
+                            }
+                        }
+                        renderProducts();
+                    }
+                )
+                .subscribe();
+        }
+
+        function showNotification(product) {
+            if (Notification.permission === "granted") {
+                new Notification("New Product Added", {
+                    body: product.name,
+                    icon: product.image
+                });
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -1,6 +1,5 @@
 /**
  * Themed components with SpiceCart Typography
- * Updated to match exact blueprint specs including letter spacing.
  */
 import { Text as DefaultText, View as DefaultView, StyleSheet } from 'react-native';
 import Colors from '@/constants/Colors';
@@ -38,7 +37,6 @@ export function Text(props: TextProps) {
   const { style, lightColor, darkColor, variant = 'body1', family, ...otherProps } = props;
   const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
 
-  // Logic to pick default family based on variant if not provided
   let defaultFamily: keyof typeof Typography.fontFamily = 'body';
   if (variant === 'display1' || variant === 'display2') defaultFamily = 'display';
   else if (variant === 'h1' || variant === 'h2' || variant === 'h3') defaultFamily = 'heading';
@@ -52,13 +50,11 @@ export function Text(props: TextProps) {
     color,
   };
 
-  // Blueprint: Overline has letter-spacing: 1.5
   if (variant === 'overline') {
     typographyStyle.letterSpacing = 1.5;
     typographyStyle.textTransform = 'uppercase';
   }
 
-  // Blueprint: Price is always bold
   if (variant === 'price') {
     typographyStyle.fontWeight = '700';
   }

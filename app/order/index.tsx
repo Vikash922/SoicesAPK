@@ -1,41 +1,85 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, ScrollView, FlatList, Dimensions, Image } from 'react-native';
+import { 
+  StyleSheet, 
+  TouchableOpacity, 
+  FlatList, 
+  Dimensions, 
+  ActivityIndicator,
+  View as DefaultView 
+} from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInUp, Layout } from 'react-native-reanimated';
+import { useOrders } from '@/hooks/useOrders';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import LottieView from 'lottie-react-native';
+import * as Haptics from 'expo-haptics';
+import { useCartStore } from '@/store/useCartStore';
 
 const { width } = Dimensions.get('window');
-
-const ORDERS = [
-  { id: '1', orderNo: 'SPC-2847', date: '3 May 2025', status: 'Out for Delivery', total: 897, items: 3, thumb: 'https://images.unsplash.com/photo-1599590984817-0dc18393593e?q=80&w=100' },
-  { id: '2', orderNo: 'SPC-2710', date: '28 April 2025', status: 'Delivered', total: 1245, items: 5, thumb: 'https://images.unsplash.com/photo-1615485290382-441e4d0c9cb5?q=80&w=100' },
-  { id: '3', orderNo: 'SPC-2601', date: '15 April 2025', status: 'Delivered', total: 450, items: 2, thumb: 'https://images.unsplash.com/photo-1532336414038-cf19250c5757?q=80&w=100' },
-  { id: '4', orderNo: 'SPC-2580', date: '2 April 2025', status: 'Cancelled', total: 890, items: 4, thumb: 'https://images.unsplash.com/photo-1596450514735-24402770edec?q=80&w=100' },
-];
 
 export default function OrderListScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const addItem = useCartStore((state) => state.addItem);
 
-  const getStatusColor = (status: string) => {
+  const { data: orders, isLoading } = useOrders();
+
+  const getStatusInfo = (status: string) => {
     switch (status) {
-      case 'Out for Delivery': return colors.saffron;
-      case 'Delivered': return colors.cardamom;
-      case 'Cancelled': return colors.chili;
-      default: return colors.tabIconDefault;
+      case 'out_for_delivery': return { color: colors.saffron, icon: 'bicycle-outline' };
+      case 'delivered': return { color: colors.cardamom, icon: 'checkmark-done-outline' };
+      case 'cancelled': return { color: colors.chili, icon: 'close-circle-outline' };
+      case 'confirmed': return { color: '#4285F4', icon: 'ribbon-outline' };
+      default: return { color: colors.tabIconDefault, icon: 'cube-outline' };
     }
   };
+
+  const handleReorder = (order: any) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // Add all items from this order to cart (simplified)
+    // In a real app, you'd fetch the product details
+    router.push('/(tabs)/cart');
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.saffron} />
+      </View>
+    );
+  }
+
+  if (!orders || orders.length === 0) {
+    return (
+      <View style={[styles.container, styles.emptyContainer, { backgroundColor: colors.background }]}>
+        <LottieView 
+          source={require('@/assets/lottie/empty_jar.json')} 
+          autoPlay 
+          loop 
+          style={styles.emptyLottie} 
+        />
+        <Text variant="h2" family="heading" style={{ marginTop: -20 }}>Your Spice Box is Empty</Text>
+        <Text variant="body2" style={{ opacity: 0.6, textAlign: 'center', marginTop: 10, marginBottom: 30 }}>
+          You haven't placed any orders yet. Start your aromatic journey today!
+        </Text>
+        <Button title="START SHOPPING" onPress={() => router.replace('/(tabs)/')} style={{ width: '100%' }} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen 
         options={{
           headerShown: true,
-          headerTitle: 'My Orders',
+          headerTitle: 'Order History',
+          headerTitleStyle: { fontFamily: 'Poppins-Bold' },
           headerStyle: { backgroundColor: colors.background },
           headerTintColor: colors.text,
           headerShadowVisible: false,
@@ -48,40 +92,63 @@ export default function OrderListScreen() {
       />
 
       <FlatList
-        data={ORDERS}
+        data={orders}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
-        renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInUp.delay(index * 100)}>
-            <TouchableOpacity 
-              style={[styles.orderCard, { backgroundColor: colors.card || '#fff' }]}
-              onPress={() => router.push(`/order/${item.id}`)}
-            >
-              <View style={styles.orderHeader}>
-                <View>
-                  <Text variant="body1" family="heading">{item.orderNo}</Text>
-                  <Text variant="caption" style={{ opacity: 0.5 }}>{item.date}</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '15' }]}>
-                   <Text variant="overline" style={{ color: getStatusColor(item.status) }}>{item.status.toUpperCase()}</Text>
-                </View>
-              </View>
+        showsVerticalScrollIndicator={false}
+        renderItem={({ item, index }) => {
+          const statusInfo = getStatusInfo(item.status);
+          return (
+            <Animated.View entering={FadeInUp.delay(index * 100)} layout={Layout.springify()}>
+              <Card glass intensity={5} style={styles.orderCard}>
+                <TouchableOpacity 
+                  activeOpacity={0.8}
+                  onPress={() => router.push(`/order/${item.id}`)}
+                >
+                  <View style={styles.orderHeader}>
+                    <View style={styles.orderMeta}>
+                      <View style={[styles.statusIcon, { backgroundColor: statusInfo.color + '15' }]}>
+                        <Ionicons name={statusInfo.icon as any} size={20} color={statusInfo.color} />
+                      </View>
+                      <View style={{ marginLeft: 12 }}>
+                        <Text variant="body2" family="heading">Order #{item.order_number}</Text>
+                        <Text variant="caption" style={{ opacity: 0.5 }}>
+                          {new Date(item.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '15' }]}>
+                       <Text variant="overline" style={{ color: statusInfo.color, fontSize: 8 }}>{item.status.replace(/_/g, ' ')}</Text>
+                    </View>
+                  </View>
 
-              <View style={[styles.divider, { backgroundColor: colors.tabIconDefault + '20' }]} />
+                  <View style={[styles.divider, { backgroundColor: colors.tabIconDefault + '10' }]} />
 
-              <View style={styles.orderFooter}>
-                <View style={styles.itemsPreview}>
-                   <Image source={{ uri: item.thumb }} style={styles.thumb} />
-                   <Text variant="caption" style={{ marginLeft: 10 }}>+ {item.items - 1} other items</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                   <Text variant="caption">Total Amount</Text>
-                   <Text variant="body1" family="price" style={{ color: colors.saffron }}>₹{item.total}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
+                  <View style={styles.orderFooter}>
+                    <View>
+                       <Text variant="caption" style={{ opacity: 0.6 }}>Total Amount</Text>
+                       <Text variant="body1" family="price" style={{ color: colors.saffron }}>₹{item.total_amount}</Text>
+                    </View>
+                    <View style={styles.footerActions}>
+                       <TouchableOpacity 
+                         onPress={() => handleReorder(item)}
+                         style={[styles.reorderBtn, { borderColor: colors.saffron }]}
+                       >
+                         <Text variant="caption" family="heading" style={{ color: colors.saffron }}>REORDER</Text>
+                       </TouchableOpacity>
+                       <TouchableOpacity 
+                         style={[styles.trackBtn, { backgroundColor: colors.saffron }]}
+                         onPress={() => router.push(`/order/${item.id}`)}
+                       >
+                         <Ionicons name="chevron-forward" size={18} color="#000" />
+                       </TouchableOpacity>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </Card>
+            </Animated.View>
+          );
+        }}
       />
     </View>
   );
@@ -89,22 +156,24 @@ export default function OrderListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  emptyLottie: { width: 300, height: 300 },
   headerBtn: { padding: 10 },
   listContent: { padding: 20 },
   orderCard: { 
     padding: 16, 
-    borderRadius: 20, 
-    marginBottom: 15,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    borderRadius: 24, 
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
-  orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  orderMeta: { flexDirection: 'row', alignItems: 'center' },
+  statusIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   divider: { height: 1, marginVertical: 15 },
   orderFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  itemsPreview: { flexDirection: 'row', alignItems: 'center' },
-  thumb: { width: 32, height: 32, borderRadius: 6 },
+  footerActions: { flexDirection: 'row', alignItems: 'center' },
+  reorderBtn: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 10, borderWidth: 1, marginRight: 10 },
+  trackBtn: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 });

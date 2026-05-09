@@ -1,9 +1,12 @@
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { BlurView } from 'expo-blur';
+import { Platform, StyleSheet } from 'react-native';
 
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useCartStore } from '@/store/useCartStore';
 
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof Ionicons>['name'];
@@ -14,17 +17,33 @@ function TabBarIcon(props: {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
+  const isDark = colorScheme === 'dark';
+  const itemCount = useCartStore((state) => state.items.reduce((acc, item) => acc + item.qty, 0));
 
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme].tint,
         tabBarInactiveTintColor: Colors[colorScheme].tabIconDefault,
-        headerShown: false, // We'll use custom headers in screens
+        headerShown: false,
+        tabBarBackground: () => (
+          <BlurView 
+            intensity={isDark ? 40 : 80} 
+            tint={isDark ? 'dark' : 'default'} 
+            style={StyleSheet.absoluteFill} 
+          />
+        ),
         tabBarStyle: {
-          backgroundColor: Colors[colorScheme].background,
-          borderTopWidth: 1,
-          borderTopColor: colorScheme === 'light' ? '#eee' : '#333',
+          backgroundColor: 'transparent',
+          position: 'absolute',
+          borderTopWidth: 0,
+          elevation: 0,
+          height: Platform.OS === 'ios' ? 88 : 64,
+          paddingBottom: Platform.OS === 'ios' ? 30 : 10,
+        },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '500',
         },
       }}>
       <Tabs.Screen
@@ -46,6 +65,13 @@ export default function TabLayout() {
         options={{
           title: 'Cart',
           tabBarIcon: ({ color }) => <TabBarIcon name="cart-outline" color={color} />,
+          tabBarBadge: itemCount > 0 ? itemCount : undefined,
+          tabBarBadgeStyle: { 
+            backgroundColor: Colors[colorScheme].saffron, 
+            color: '#000',
+            fontSize: 10,
+            lineHeight: 14,
+          }
         }}
       />
       <Tabs.Screen

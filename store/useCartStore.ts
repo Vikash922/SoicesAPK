@@ -19,6 +19,7 @@ interface CartState {
   removeItem: (id: string) => void;
   updateQty: (id: string, qty: number) => void;
   clearCart: () => void;
+  setItems: (items: CartItem[]) => void;
   applyCoupon: (code: string) => void;
   subtotal: () => number;
   total: () => number;
@@ -59,6 +60,8 @@ export const useCartStore = create<CartState>()(
       },
 
       clearCart: () => set({ items: [], couponCode: null, discount: 0 }),
+
+      setItems: (items) => set({ items }),
 
       applyCoupon: (code) => {
         // Mock coupon logic

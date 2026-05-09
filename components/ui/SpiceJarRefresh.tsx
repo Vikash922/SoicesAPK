@@ -1,53 +1,51 @@
-import React, { useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { 
-  useSharedValue, 
   useAnimatedStyle, 
-  withRepeat, 
-  withTiming, 
-  Easing,
   interpolate,
-  useDerivedValue
+  SharedValue,
+  Extrapolate
 } from 'react-native-reanimated';
-import { Text } from '@/components/Themed';
+import LottieView from 'lottie-react-native';
 
-export const SpiceJarRefresh = ({ progress }: { progress: Animated.SharedValue<number> }) => {
-  const rotate = useDerivedValue(() => {
-    return interpolate(progress.value, [0, 1], [0, 45]);
+const AnimatedLottieView = Animated.createAnimatedComponent(LottieView);
+
+export const SpiceJarRefresh = ({ progress }: { progress: SharedValue<number> }) => {
+  const lottieRef = useRef<LottieView>(null);
+
+  const containerStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(progress.value, [0, 0.5, 1], [0, 1, 1], Extrapolate.CLAMP),
+      transform: [
+        { translateY: interpolate(progress.value, [0, 1], [-20, 0], Extrapolate.CLAMP) },
+        { scale: interpolate(progress.value, [0, 1], [0.8, 1], Extrapolate.CLAMP) }
+      ],
+      height: interpolate(progress.value, [0, 1], [0, 100], Extrapolate.CLAMP),
+    };
   });
 
-  const jarStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotate.value}deg` }, { scale: interpolate(progress.value, [0, 1], [0.8, 1.2]) }],
-    opacity: progress.value,
-  }));
-
-  const powderHeight = useSharedValue(0);
-  
-  useEffect(() => {
-    if (progress.value > 0.9) {
-      powderHeight.value = withRepeat(withTiming(40, { duration: 1000 }), -1, true);
-    } else {
-      powderHeight.value = 0;
-    }
-  }, [progress.value]);
-
-  const powderStyle = useAnimatedStyle(() => ({
-    height: powderHeight.value,
-    opacity: interpolate(progress.value, [0.8, 1], [0, 1]),
-  }));
-
   return (
-    <View style={styles.container}>
-      <Animated.View style={[styles.jarContainer, jarStyle]}>
-        <Text style={{ fontSize: 40 }}>🏺</Text>
-      </Animated.View>
-      <Animated.View style={[styles.powder, powderStyle]} />
-    </View>
+    <Animated.View style={[styles.container, containerStyle]}>
+      <AnimatedLottieView
+        ref={lottieRef}
+        source={require('@/assets/lottie/jar_pour.json')}
+        progress={progress}
+        style={styles.lottie}
+        resizeMode="contain"
+      />
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { height: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
-  jarContainer: { zIndex: 2 },
-  powder: { width: 3, backgroundColor: '#E2B714', borderRadius: 2, marginTop: -10 },
+  container: { 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  lottie: {
+    width: 80,
+    height: 80,
+  },
 });
