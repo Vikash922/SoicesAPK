@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Dimensions } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useRouter } from 'expo-router';
@@ -29,6 +29,7 @@ export default function SplashScreen() {
   const textOpacity = useSharedValue(0);
   const loadingWidth = useSharedValue(0);
   const splashOpacity = useSharedValue(1);
+  const [typedCount, setTypedCount] = useState(0);
 
   useEffect(() => {
     // Icon Animation
@@ -40,6 +41,10 @@ export default function SplashScreen() {
 
     // Text Fade In
     textOpacity.value = withDelay(800, withTiming(1, { duration: 800 }));
+
+    const typing = setInterval(() => {
+      setTypedCount((v) => (v < 9 ? v + 1 : v));
+    }, 120);
 
     // Loading Bar
     loadingWidth.value = withDelay(500, withTiming(1, { duration: 2000 }));
@@ -57,7 +62,7 @@ export default function SplashScreen() {
       });
     }, 3500);
 
-    return () => clearTimeout(timeout);
+    return () => { clearTimeout(timeout); clearInterval(typing); };
   }, []);
 
   const iconStyle = useAnimatedStyle(() => ({
@@ -92,7 +97,7 @@ export default function SplashScreen() {
         </Animated.View>
 
         <Animated.View style={[styles.textContainer, textStyle]}>
-          <Text variant="display1" family="display" style={styles.title}>SPICECART</Text>
+          <Text variant="display1" family="display" style={styles.title}>{'SPICECART'.slice(0, typedCount)}</Text>
           <Text variant="body1" style={styles.subtitle}>The World of Spices</Text>
         </Animated.View>
       </View>
@@ -112,7 +117,7 @@ export default function SplashScreen() {
       
       {/* Floating Particles Emulation (Simple version) */}
       <View style={styles.particlesContainer} pointerEvents="none">
-         {['🌶️', '🌿', '🧂', '🥘', '🍲'].map((emoji, i) => (
+         {['🌶️','🌿','🧂','🥘','🍲','🫚','🌱','🍛','🌶️','🥄','🌿','🧂','🍲','🫚','🌱'].map((emoji, i) => (
            <FloatingEmoji key={i} emoji={emoji} index={i} />
          ))}
       </View>

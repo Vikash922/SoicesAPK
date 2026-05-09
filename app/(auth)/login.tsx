@@ -1,42 +1,55 @@
-import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
-import { Text, View } from '@/components/Themed';
-import { useRouter } from 'expo-router';
-import { AnimatedBackground } from '@/components/ui/AnimatedBackground';
-import { Button } from '@/components/ui/Button';
-import { Switch } from '@/components/ui/Switch';
-import { useAuthStore } from '@/store/useAuthStore';
+import React, { useMemo, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '@/lib/supabase';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
 import { MotiView } from 'moti';
+import { Text, View } from '@/components/Themed';
+import { Button } from '@/components/ui/Button';
+import { useAuthStore } from '@/store/useAuthStore';
+import { supabase } from '@/lib/supabase';
 
-// Ensure the browser can handle the redirect back to the app
-WebBrowser.maybeCompleteAuthSession();
+type LoginMethod = 'phone' | 'email';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [loginMethod, setLoginMethod] = useState<'phone' | 'email'>('phone');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  
   const { setAuthenticated, setGuest } = useAuthStore();
 
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>('email');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const isFormValid = useMemo(() => {
+    if (!password.trim()) return false;
+    return loginMethod === 'email' ? /.+@.+\..+/.test(email.trim()) : phone.trim().length >= 8;
+  }, [email, phone, password, loginMethod]);
+
   const handleLogin = async () => {
+    if (!isFormValid) {
+      Alert.alert('Missing details', 'Please enter valid credentials to continue.');
+      return;
+    }
+
     try {
       setIsLoading(true);
-      
-      const credentials = loginMethod === 'email' 
-        ? { email, password } 
-        : { phone, password };
+      const credentials =
+        loginMethod === 'email'
+          ? { email: email.trim().toLowerCase(), password }
+          : { phone: phone.trim(), password };
 
       const { data, error } = await supabase.auth.signInWithPassword(credentials);
-
       if (error) throw error;
 
       if (data.session) {
@@ -44,316 +57,117 @@ export default function LoginScreen() {
         router.replace('/(tabs)');
       }
     } catch (error: any) {
-      Alert.alert('Login Error', error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGuest = () => {
-    setGuest(true);
-    router.replace('/(tabs)');
-  };
-
-  const handleSocialLogin = async (provider: 'google' | 'apple') => {
-    try {
-      setIsLoading(true);
-      const redirectUrl = Linking.createURL('/(auth)/login');
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-        
-        if (result.type === 'success') {
-          const { url } = result;
-          const params = Linking.parse(url);
-          
-          if (params.queryParams?.access_token) {
-            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-              access_token: params.queryParams.access_token as string,
-              refresh_token: params.queryParams.refresh_token as string,
-            });
-            if (sessionError) throw sessionError;
-            
-            if (sessionData.session) {
-              await setAuthenticated(sessionData.session);
-              router.replace('/(tabs)');
-            }
-          }
-        }
-      }
-    } catch (error: any) {
-      console.error(`${provider} login error:`, error.message);
+      Alert.alert('Login failed', error?.message ?? 'Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <AnimatedBackground />
-      
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.content}
-      >
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <MotiView 
-            from={{ opacity: 0, translateY: -20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            transition={{ type: 'timing', duration: 800 }}
-            style={styles.header}
-          >
-            <Text variant="display2" family="display" style={styles.title}>Welcome Back</Text>
-            <Text variant="body1" style={styles.subtitle}>Taste the excellence of pure spices</Text>
+    <LinearGradient colors={['#0F1021', '#1A1A2E', '#2B1D12']} style={styles.container}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <MotiView from={{ opacity: 0, translateY: -16 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', duration: 450 }}>
+            <Text style={styles.badge}>SPICECART</Text>
+            <Text style={styles.heading}>Welcome Back</Text>
+            <Text style={styles.subheading}>Premium spices, faster checkout, zero friction.</Text>
           </MotiView>
 
-          <MotiView
-            from={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 200, type: 'timing', duration: 600 }}
-            style={styles.methodToggle}
-          >
-            <TouchableOpacity 
-              style={[styles.methodBtn, loginMethod === 'phone' && styles.methodBtnActive]} 
-              onPress={() => setLoginMethod('phone')}
-            >
-              <Text style={[styles.methodBtnText, loginMethod === 'phone' && styles.methodBtnTextActive]}>Phone</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.methodBtn, loginMethod === 'email' && styles.methodBtnActive]} 
-              onPress={() => setLoginMethod('email')}
-            >
-              <Text style={[styles.methodBtnText, loginMethod === 'email' && styles.methodBtnTextActive]}>Email</Text>
-            </TouchableOpacity>
-          </MotiView>
+          <MotiView from={{ opacity: 0, translateY: 12 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', delay: 120, duration: 400 }} style={styles.card}>
+            <View style={styles.toggle}>
+              {(['email', 'phone'] as LoginMethod[]).map((mode) => (
+                <Pressable key={mode} onPress={() => setLoginMethod(mode)} style={[styles.toggleBtn, loginMethod === mode && styles.toggleBtnActive]}>
+                  <Text style={[styles.toggleText, loginMethod === mode && styles.toggleTextActive]}>{mode === 'email' ? 'Email' : 'Phone'}</Text>
+                </Pressable>
+              ))}
+            </View>
 
-          <View style={styles.form}>
-            {loginMethod === 'phone' ? (
-              <MotiView
-                from={{ opacity: 0, translateX: -20 }}
-                animate={{ opacity: 1, translateX: 0 }}
-                transition={{ delay: 300 }}
-                style={styles.inputContainer}
-              >
-                <Text style={styles.label}>Phone Number</Text>
-                <View style={styles.phoneInputRow}>
-                  <View style={styles.countryCode}>
-                    <Text style={styles.countryCodeText}>+91</Text>
-                  </View>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter phone number"
-                    placeholderTextColor="rgba(255,255,255,0.4)"
-                    value={phone}
-                    onChangeText={setPhone}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-              </MotiView>
+            {loginMethod === 'email' ? (
+              <TextInput
+                style={styles.input}
+                placeholder="name@email.com"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={email}
+                onChangeText={setEmail}
+              />
             ) : (
-              <MotiView
-                from={{ opacity: 0, translateX: 20 }}
-                animate={{ opacity: 1, translateX: 0 }}
-                transition={{ delay: 300 }}
-                style={styles.inputContainer}
-              >
-                <Text style={styles.label}>Email Address</Text>
+              <View style={styles.phoneRow}>
+                <Text style={styles.code}>+91</Text>
                 <TextInput
-                  style={styles.input}
-                  placeholder="Enter your email"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
+                  style={[styles.input, styles.phoneInput]}
+                  placeholder="Phone number"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="phone-pad"
+                  value={phone}
+                  onChangeText={setPhone}
                 />
-              </MotiView>
+              </View>
             )}
 
-            <MotiView
-              from={{ opacity: 0, translateY: 10 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ delay: 400 }}
-              style={styles.inputContainer}
-            >
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.passwordRow}>
-                <TextInput
-                  style={[styles.input, { flex: 1, backgroundColor: 'transparent' }]}
-                  placeholder="Enter password"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                  <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color="#E2B714" />
-                </TouchableOpacity>
-              </View>
-            </MotiView>
-
-            <MotiView 
-              from={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 500 }}
-              style={styles.extraRow}
-            >
-              <TouchableOpacity 
-                style={styles.rememberRow} 
-                onPress={() => setRememberMe(!rememberMe)}
-                activeOpacity={0.8}
-              >
-                <Switch value={rememberMe} onValueChange={setRememberMe} />
-                <Text style={styles.rememberText}>Remember me</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
-                <Text style={styles.forgotText}>Forgot Password?</Text>
-              </TouchableOpacity>
-            </MotiView>
-
-            <MotiView
-              from={{ opacity: 0, translateY: 20 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ delay: 600 }}
-            >
-              <Button 
-                title={isLoading ? "AUTHENTICATING..." : "LOGIN"} 
-                onPress={handleLogin} 
-                style={styles.loginButton} 
-                disabled={isLoading}
+            <View style={styles.passwordRow}>
+              <TextInput
+                style={[styles.input, styles.passwordInput]}
+                placeholder="Password"
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
               />
-            </MotiView>
-            
-            <MotiView 
-              from={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 700 }}
-              style={styles.dividerContainer}
-            >
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>or continue with</Text>
-              <View style={styles.divider} />
-            </MotiView>
-
-            <MotiView 
-              from={{ opacity: 0, translateY: 20 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ delay: 800 }}
-              style={styles.socialRow}
-            >
-              <TouchableOpacity 
-                style={styles.socialButton} 
-                onPress={() => handleSocialLogin('google')}
-                disabled={isLoading}
-              >
-                <Ionicons name="logo-google" size={24} color="#FFF" />
-                <Text style={styles.socialButtonText}>Google</Text>
+              <TouchableOpacity onPress={() => setShowPassword((v) => !v)}>
+                <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#E2B714" />
               </TouchableOpacity>
+            </View>
 
-              <TouchableOpacity 
-                style={styles.socialButton} 
-                onPress={() => handleSocialLogin('apple')}
-                disabled={isLoading}
-              >
-                <Ionicons name="logo-apple" size={24} color="#FFF" />
-                <Text style={styles.socialButtonText}>Apple</Text>
-              </TouchableOpacity>
-            </MotiView>
+            <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')} style={styles.linkWrap}>
+              <Text style={styles.link}>Forgot Password?</Text>
+            </TouchableOpacity>
 
-            <MotiView 
-              from={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 900 }}
-              style={styles.footer}
+            <Button title={isLoading ? 'AUTHENTICATING...' : 'LOGIN'} onPress={handleLogin} disabled={isLoading || !isFormValid} style={styles.loginBtn} />
+
+            <TouchableOpacity onPress={() => router.push('/(auth)/signup')} style={styles.linkWrap}>
+              <Text style={styles.link}>New here? Create account</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                setGuest(true);
+                router.replace('/(tabs)');
+              }}
+              style={styles.guestBtn}
             >
-              <Text style={styles.footerText}>New to SpiceCart? </Text>
-              <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
-                <Text style={styles.registerText}>Register Now</Text>
-              </TouchableOpacity>
-            </MotiView>
-
-            <MotiView 
-              from={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1000 }}
-            >
-              <TouchableOpacity style={styles.guestButton} onPress={handleGuest}>
-                <Text style={styles.guestText}>Continue as Guest</Text>
-              </TouchableOpacity>
-            </MotiView>
-          </View>
+              <Text style={styles.guestText}>Continue as Guest</Text>
+            </TouchableOpacity>
+          </MotiView>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   container: { flex: 1 },
-  content: { flex: 1 },
-  scrollContent: { paddingHorizontal: 30, paddingVertical: 60, justifyContent: 'center', minHeight: '100%' },
-  header: { marginBottom: 30, backgroundColor: 'transparent' },
-  title: { color: '#E2B714' },
-  subtitle: { color: '#E2B714', opacity: 0.7, marginTop: 8 },
-  methodToggle: { 
-    flexDirection: 'row', 
-    backgroundColor: 'rgba(255,255,255,0.05)', 
-    borderRadius: 15, 
-    padding: 4, 
-    marginBottom: 25,
-    borderWidth: 1,
-    borderColor: 'rgba(226, 183, 20, 0.1)'
-  },
-  methodBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12 },
-  methodBtnActive: { backgroundColor: 'rgba(226, 183, 20, 0.2)' },
-  methodBtnText: { color: '#FFF', opacity: 0.6, fontWeight: '600' },
-  methodBtnTextActive: { color: '#E2B714', opacity: 1 },
-  form: { backgroundColor: 'transparent' },
-  inputContainer: { marginBottom: 15, backgroundColor: 'transparent' },
-  label: { color: '#E2B714', marginBottom: 8, fontSize: 12, fontWeight: 'bold', letterSpacing: 0.5 },
-  phoneInputRow: { flexDirection: 'row', alignItems: 'center' },
-  countryCode: { padding: 12, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, marginRight: 10, borderWidth: 1, borderColor: 'rgba(226, 183, 20, 0.1)' },
-  countryCodeText: { color: '#FFF' },
-  input: { padding: 14, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 12, color: '#FFF', flex: 1, borderWidth: 1, borderColor: 'rgba(226, 183, 20, 0.1)', fontFamily: 'Inter_400Regular' },
-  passwordRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 12, paddingRight: 10, borderWidth: 1, borderColor: 'rgba(226, 183, 20, 0.1)' },
-  eyeIcon: { padding: 5 },
-  extraRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 5, marginBottom: 20 },
-  rememberRow: { flexDirection: 'row', alignItems: 'center' },
-  rememberText: { color: '#FFF', marginLeft: 10, fontSize: 13, opacity: 0.8 },
-  forgotText: { color: '#E2B714', fontSize: 13, fontWeight: '600' },
-  loginButton: { height: 56, borderRadius: 15 },
-  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 25 },
-  divider: { flex: 1, height: 1, backgroundColor: 'rgba(226, 183, 20, 0.2)' },
-  dividerText: { color: '#E2B714', marginHorizontal: 15, fontSize: 11, opacity: 0.6, letterSpacing: 1 },
-  socialRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 15 },
-  socialButton: { 
-    flex: 1, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    backgroundColor: 'rgba(255,255,255,0.05)', 
-    padding: 14, 
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(226, 183, 20, 0.1)'
-  },
-  socialButtonText: { color: '#FFF', marginLeft: 10, fontWeight: '600' },
-  footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 30 },
-  footerText: { color: '#FFF', opacity: 0.6 },
-  registerText: { color: '#E2B714', fontWeight: 'bold' },
-  guestButton: { marginTop: 20, alignItems: 'center' },
-  guestText: { color: '#E2B714', textDecorationLine: 'underline', opacity: 0.7, fontSize: 13 }
+  scroll: { flexGrow: 1, justifyContent: 'center', padding: 22 },
+  badge: { color: '#E2B714', letterSpacing: 2, fontSize: 12, marginBottom: 10 },
+  heading: { color: '#FFF8E7', fontSize: 34, fontWeight: '800' },
+  subheading: { color: '#D1D5DB', marginTop: 8, marginBottom: 22 },
+  card: { backgroundColor: 'rgba(12,12,24,0.86)', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: 'rgba(226,183,20,0.22)' },
+  toggle: { flexDirection: 'row', backgroundColor: '#111827', borderRadius: 12, padding: 4, marginBottom: 14 },
+  toggleBtn: { flex: 1, paddingVertical: 10, borderRadius: 10 },
+  toggleBtnActive: { backgroundColor: '#E2B714' },
+  toggleText: { textAlign: 'center', color: '#E5E7EB', fontWeight: '600' },
+  toggleTextActive: { color: '#111827' },
+  input: { backgroundColor: '#1F2937', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#FFF8E7', marginBottom: 12 },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  code: { color: '#FFF8E7', backgroundColor: '#1F2937', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12, marginBottom: 12 },
+  phoneInput: { flex: 1 },
+  passwordRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1F2937', borderRadius: 12, paddingRight: 12, marginBottom: 2 },
+  passwordInput: { flex: 1, marginBottom: 0, backgroundColor: 'transparent' },
+  linkWrap: { alignSelf: 'flex-end', marginTop: 10 },
+  link: { color: '#E2B714', fontWeight: '600' },
+  loginBtn: { marginTop: 16 },
+  guestBtn: { marginTop: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,248,231,0.25)' },
+  guestText: { textAlign: 'center', color: '#FFF8E7', fontWeight: '700' },
 });
-
-
