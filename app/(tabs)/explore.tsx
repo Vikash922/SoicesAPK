@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { useProducts, useCategories } from '@/hooks/useProducts';
 import { SpiceShimmerLoader } from '@/components/spice/SpiceShimmerLoader';
 import { SpiceSearchBar } from '@/components/spice/SpiceSearchBar';
+import { SpiceEmptyState } from '@/components/spice/SpiceEmptyState';
 
 const { width } = Dimensions.get('window');
 
@@ -19,6 +20,7 @@ export default function ExploreScreen() {
   const [activeFilter, setActiveFilter] = useState('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'popular' | 'priceLow' | 'priceHigh' | 'rating'>('popular');
 
   const { data: allProducts, isLoading: isLoadingProducts } = useProducts();
   const { data: categories, isLoading: isLoadingCategories } = useCategories();
@@ -37,9 +39,14 @@ export default function ExploreScreen() {
     const base = activeFilter === 'All'
       ? allProducts
       : allProducts.filter((p) => p.category_id === categories?.find((c) => c.name === activeFilter)?.id);
-    if (!searchLower) return base;
-    return base.filter((p) => p.name.toLowerCase().includes(searchLower));
-  }, [allProducts, activeFilter, categories, searchQuery]);
+    const searched = !searchLower ? base : base.filter((p) => p.name.toLowerCase().includes(searchLower));
+    return [...searched].sort((a, b) => {
+      if (sortBy === 'priceLow') return a.price - b.price;
+      if (sortBy === 'priceHigh') return b.price - a.price;
+      if (sortBy === 'rating') return (b.avg_rating || 0) - (a.avg_rating || 0);
+      return (b.popularity_score || 0) - (a.popularity_score || 0);
+    });
+  }, [allProducts, activeFilter, categories, searchQuery, sortBy]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -80,6 +87,24 @@ export default function ExploreScreen() {
           ))}
         </ScrollView>
       </View>
+      <View style={styles.sortRow}>
+        {[
+          { key: 'popular', label: 'Popular' },
+          { key: 'priceLow', label: 'Price ↑' },
+          { key: 'priceHigh', label: 'Price ↓' },
+          { key: 'rating', label: 'Top Rated' },
+        ].map((item) => (
+          <TouchableOpacity
+            key={item.key}
+            onPress={() => setSortBy(item.key as any)}
+            style={[styles.sortChip, { backgroundColor: sortBy === item.key ? colors.saffron : colors.card }]}
+          >
+            <Text variant="caption" family="heading" style={{ color: sortBy === item.key ? '#000' : colors.text }}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       {/* Product List */}
       {isLoadingProducts ? (
@@ -92,6 +117,16 @@ export default function ExploreScreen() {
             />
           ))}
         </View>
+      ) : filteredProducts.length === 0 ? (
+        <SpiceEmptyState
+          type="search"
+          message="No products matched your search/filter. Try another keyword."
+          action={() => {
+            setSearchQuery('');
+            setActiveFilter('All');
+          }}
+          actionLabel="RESET FILTERS"
+        />
       ) : (
         <FlatList
           data={filteredProducts}
@@ -146,6 +181,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 10,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 14,
+    paddingBottom: 8,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sortChip: {
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   productList: {
     paddingHorizontal: 10,
