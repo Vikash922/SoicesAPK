@@ -10,6 +10,7 @@ import { useProducts, useCategories } from '@/hooks/useProducts';
 import { SpiceShimmerLoader } from '@/components/spice/SpiceShimmerLoader';
 import { SpiceSearchBar } from '@/components/spice/SpiceSearchBar';
 import { SpiceEmptyState } from '@/components/spice/SpiceEmptyState';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -21,9 +22,34 @@ export default function ExploreScreen() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'popular' | 'priceLow' | 'priceHigh' | 'rating'>('popular');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const RECENT_SEARCH_KEY = 'spicecart.recent_searches';
 
   const { data: allProducts, isLoading: isLoadingProducts } = useProducts();
   const { data: categories, isLoading: isLoadingCategories } = useCategories();
+  React.useEffect(() => {
+    AsyncStorage.getItem(RECENT_SEARCH_KEY).then((value) => {
+      if (value) setRecentSearches(JSON.parse(value));
+    });
+  }, []);
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const persistRecentSearch = async (query: string) => {
+    const normalized = query.trim();
+    if (!normalized) return;
+    const next = [normalized, ...recentSearches.filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(0, 6);
+    setRecentSearches(next);
+    await AsyncStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(next));
+  };
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      persistRecentSearch(searchQuery);
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   const filters = useMemo(() => {
     const baseFilters = ['All'];
@@ -63,8 +89,18 @@ export default function ExploreScreen() {
 
       {/* Filter Chips */}
       <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
-        <SpiceSearchBar placeholder="Search spices..." onSearch={setSearchQuery} voiceEnabled />
+        <SpiceSearchBar placeholder="Search spices..." onSearch={handleSearch} voiceEnabled />
       </View>
+      {recentSearches.length > 0 && !searchQuery.trim() && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentRow}>
+          {recentSearches.map((item) => (
+            <TouchableOpacity key={item} onPress={() => setSearchQuery(item)} style={[styles.recentChip, { borderColor: colors.card }]}>
+              <Ionicons name="time-outline" size={14} color={colors.tabIconDefault} />
+              <Text variant="caption" style={{ marginLeft: 6 }}>{item}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterList}>
           {filters.map((filter) => (
@@ -94,8 +130,8 @@ export default function ExploreScreen() {
           { key: 'priceHigh', label: 'Price ↓' },
           { key: 'rating', label: 'Top Rated' },
         ].map((item) => (
-          <TouchableOpacity
-            key={item.key}
+            <TouchableOpacity
+              key={item.key}
             onPress={() => setSortBy(item.key as any)}
             style={[styles.sortChip, { backgroundColor: sortBy === item.key ? colors.saffron : colors.card }]}
           >
@@ -193,6 +229,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
+  },
+  recentRow: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  recentChip: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
   },
   productList: {
     paddingHorizontal: 10,
