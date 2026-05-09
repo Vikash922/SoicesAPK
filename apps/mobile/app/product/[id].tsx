@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, View as DefaultView } from 'react-native';
+import { StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, View as DefaultView, ActivityIndicator } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import Colors from '@/constants/Colors';
@@ -15,10 +15,10 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCartStore } from '@/store/useCartStore';
 import { useWishlistStore } from '@/store/useWishlistStore';
-import { useProduct } from '@/hooks/useProducts';
+import { useProduct, useReviews, useCommunityRecipes } from '@/hooks/useProducts';
 import { SpiceShimmerLoader } from '@/components/spice/SpiceShimmerLoader';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -26,8 +26,12 @@ export default function ProductDetailScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const [selectedVariant, setSelectedVariant] = React.useState('100g');
+  const [activeImageIndex, setActiveImageIndex] = React.useState(0);
 
   const { data: product, isLoading } = useProduct(id as string);
+  const { data: reviews, isLoading: isLoadingReviews } = useReviews(id as string);
+  const { data: communityRecipes, isLoading: isLoadingRecipes } = useCommunityRecipes(id as string);
+  
   const addItem = useCartStore((state) => state.addItem);
   const toggleWishlist = useWishlistStore((state) => state.toggleItem);
   const isInWishlist = useWishlistStore((state) => state.isInWishlist(id as string));
@@ -69,6 +73,12 @@ export default function ProductDetailScreen() {
 
   const images = product.images && product.images.length > 0 ? product.images : [product.image];
   const discount = product.original_price ? Math.round(((product.original_price - product.price) / product.original_price) * 100) : 0;
+
+  const ratingDistribution = [5,4,3,2,1].map((star) => {
+    if (!reviews || reviews.length === 0) return { star, percent: 0 };
+    const count = reviews.filter((r) => r.rating === star).length;
+    return { star, percent: Math.round((count / reviews.length) * 100) };
+  });
 
   const handleAddToCart = () => {
     addItem({
@@ -124,11 +134,24 @@ export default function ProductDetailScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Image Gallery */}
-        <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(e) => {
+            const index = Math.round(e.nativeEvent.contentOffset.x / width);
+            setActiveImageIndex(index);
+          }}
+        >
           {images.map((img, index) => (
             <Image key={index} source={{ uri: img }} style={styles.heroImage} />
           ))}
         </ScrollView>
+        <View style={styles.imageDots}>
+          {images.map((_, i) => (
+            <View key={i} style={[styles.dot, { backgroundColor: i === activeImageIndex ? colors.saffron : colors.tabIconDefault + '55' }]} />
+          ))}
+        </View>
 
         <View style={styles.content}>
           <View style={styles.badgeRow}>
@@ -253,6 +276,86 @@ export default function ProductDetailScreen() {
             </View>
           )}
 
+          {/* Community Recipes */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text variant="body2" family="heading" style={styles.sectionTitle}>COMMUNITY RECIPES</Text>
+              <TouchableOpacity><Text variant="caption" style={{ color: colors.saffron }}>View All</Text></TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 20 }}>
+              {isLoadingRecipes ? (
+                [1,2].map(i => <SpiceShimmerLoader key={i} variant="card" style={{ width: 140, height: 140, marginRight: 15 }} />)
+              ) : communityRecipes && communityRecipes.length > 0 ? (
+                communityRecipes.map((recipe) => (
+                  <View key={recipe.id} style={styles.communityCard}>
+                    <Image source={{ uri: recipe.image_url }} style={styles.communityImg} />
+                    <View style={[styles.communityUserRow, { backgroundColor: 'transparent' }]}>
+                      <Image source={{ uri: recipe.profiles?.avatar_url }} style={styles.communityAvatar} />
+                      <Text variant="caption" family="heading" style={{ marginLeft: 6, color: '#fff' }}>{recipe.profiles?.full_name.split(' ')[0]}</Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text variant="caption" style={{ opacity: 0.5, marginVertical: 20 }}>Be the first to share a recipe!</Text>
+              )}
+              <TouchableOpacity style={[styles.addRecipeCard, { borderColor: colors.tabIconDefault + '40', borderStyle: 'dashed', borderWidth: 1 }]}>
+                <Ionicons name="camera-outline" size={24} color={colors.saffron} />
+                <Text variant="caption" style={{ marginTop: 8, color: colors.saffron, textAlign: 'center' }}>Share your{'\n'}creation</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+
+          {/* Ratings & Reviews */}
+          <View style={styles.section}>
+            <Text variant="body2" family="heading" style={styles.sectionTitle}>RATINGS & REVIEWS</Text>
+            
+            <View style={styles.ratingSummary}>
+              <View style={styles.ratingSummaryLeft}>
+                <Text variant="display1" family="heading">{product.avg_rating || '0.0'}</Text>
+                <View style={{ flexDirection: 'row', marginVertical: 4, backgroundColor: 'transparent' }}>
+                  {[1,2,3,4,5].map(i => <Ionicons key={i} name="star" size={14} color={i <= Math.round(product.avg_rating || 0) ? colors.turmeric : colors.tabIconDefault + '44'} />)}
+                </View>
+                <Text variant="caption" style={{ opacity: 0.6 }}>{product.review_count || '0'} Reviews</Text>
+              </View>
+              
+              <View style={styles.ratingBars}>
+                {ratingDistribution.map(({ star, percent }) => {
+                  return (
+                    <View key={star} style={styles.ratingBarRow}>
+                      <Text variant="caption" style={styles.starText}>{star} <Ionicons name="star" size={10} /></Text>
+                      <View style={[styles.ratingBarBg, { backgroundColor: colors.tabIconDefault + '20' }]}>
+                        <View style={[styles.ratingBarFill, { width: `${percent}%`, backgroundColor: colors.turmeric }]} />
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+
+            {isLoadingReviews ? (
+              <ActivityIndicator color={colors.saffron} />
+            ) : reviews && reviews.length > 0 ? (
+              reviews.map((review) => (
+                <View key={review.id} style={styles.reviewItem}>
+                  <View style={styles.reviewHeader}>
+                    <Image source={{ uri: review.profiles?.avatar_url }} style={styles.reviewerAvatar} />
+                    <View style={{ marginLeft: 10 }}>
+                      <Text variant="body2" family="heading">{review.profiles?.full_name}</Text>
+                      <View style={{ flexDirection: 'row', backgroundColor: 'transparent' }}>
+                        {[1,2,3,4,5].map(i => <Ionicons key={i} name="star" size={10} color={i <= review.rating ? colors.turmeric : colors.tabIconDefault + '44'} />)}
+                      </View>
+                    </View>
+                    <Text variant="caption" style={{ marginLeft: 'auto', opacity: 0.5 }}>{new Date(review.created_at).toLocaleDateString()}</Text>
+                  </View>
+                  <Text variant="body2" style={{ opacity: 0.8, lineHeight: 20 }}>{review.comment}</Text>
+                </View>
+              ))
+            ) : (
+              <Text variant="caption" style={{ opacity: 0.5, textAlign: 'center', marginVertical: 20 }}>No reviews yet.</Text>
+            )}
+
+          </View>
+
           <View style={{ height: 120 }} />
         </View>
       </ScrollView>
@@ -269,9 +372,11 @@ export default function ProductDetailScreen() {
           />
         </View>
         <Button 
-          title={`ADD TO CART • ₹${product.price}`} 
+          title={product.is_out_of_stock ? "OUT OF STOCK" : `ADD TO CART • ₹${product.price}`} 
           onPress={handleAddToCart} 
           style={styles.addToCartBtn}
+          disabled={product.is_out_of_stock}
+          variant={product.is_out_of_stock ? "outline" : "primary"}
         />
       </View>
     </View>
@@ -282,6 +387,8 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   headerButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.8)', alignItems: 'center', justifyContent: 'center' },
   heroImage: { width: width, height: width, resizeMode: 'cover' },
+  imageDots: { flexDirection: 'row', justifyContent: 'center', marginTop: 10, gap: 6, backgroundColor: 'transparent' },
+  dot: { width: 8, height: 8, borderRadius: 4 },
   content: { padding: 24, borderTopLeftRadius: 30, borderTopRightRadius: 30, marginTop: -30 },
   badgeRow: { flexDirection: 'row', marginBottom: 16, backgroundColor: 'transparent' },
   badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
@@ -308,10 +415,21 @@ const styles = StyleSheet.create({
   nutritionGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   nutritionItem: { width: '50%', marginBottom: 12 },
   description: { lineHeight: 22, opacity: 0.8 },
-  recipeList: { backgroundColor: 'transparent' },
-  recipeCard: { width: 120, marginRight: 16 },
-  recipeImg: { width: 120, height: 120, borderRadius: 12, marginBottom: 8 },
-  recipeName: { textAlign: 'center' },
+  communityCard: { width: 140, marginRight: 15, borderRadius: 16, overflow: 'hidden' },
+  communityImg: { width: 140, height: 140, borderRadius: 16 },
+  communityUserRow: { position: 'absolute', bottom: 10, left: 10, flexDirection: 'row', alignItems: 'center' },
+  communityAvatar: { width: 20, height: 20, borderRadius: 10 },
+  addRecipeCard: { width: 140, height: 140, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  ratingSummary: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, backgroundColor: 'transparent' },
+  ratingSummaryLeft: { alignItems: 'center', marginRight: 20, backgroundColor: 'transparent' },
+  ratingBars: { flex: 1, backgroundColor: 'transparent' },
+  ratingBarRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, backgroundColor: 'transparent' },
+  starText: { width: 20, fontSize: 10, opacity: 0.6 },
+  ratingBarBg: { flex: 1, height: 6, borderRadius: 3, marginLeft: 8 },
+  ratingBarFill: { height: '100%', borderRadius: 3 },
+  reviewItem: { marginBottom: 20, backgroundColor: 'transparent' },
+  reviewHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, backgroundColor: 'transparent' },
+  reviewerAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   stickyBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingBottom: 40, flexDirection: 'row', borderTopWidth: 1 },
   wishlistBtn: { width: 56, height: 56, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   addToCartBtn: { flex: 1, height: 56 },

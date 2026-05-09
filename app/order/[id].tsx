@@ -91,6 +91,15 @@ export default function OrderTrackingScreen() {
   const isDark = colorScheme === 'dark';
 
   const { data: order, isLoading } = useOrder(id as string);
+  const storeLocation = { latitude: 19.076, longitude: 72.8777 };
+  const destinationLocation = {
+    latitude: order?.delivery_latitude || 19.096,
+    longitude: order?.delivery_longitude || 72.905,
+  };
+  const currentLocation = {
+    latitude: (storeLocation.latitude + destinationLocation.latitude) / 2,
+    longitude: (storeLocation.longitude + destinationLocation.longitude) / 2,
+  };
 
   const timelineSteps = useMemo(() => {
     if (!order) return [];
@@ -119,7 +128,11 @@ export default function OrderTrackingScreen() {
       />
 
       <View style={styles.mapWrapper}>
-        <SpiceMapView />
+        <SpiceMapView
+          storeLocation={storeLocation}
+          destinationLocation={destinationLocation}
+          currentLocation={currentLocation}
+        />
         <BlurView intensity={isDark ? 40 : 80} tint={isDark ? 'dark' : 'light'} style={styles.etaOverlay}>
           <Text variant="caption" family="badge" style={{ color: colors.saffron, letterSpacing: 2 }}>ESTIMATED ARRIVAL</Text>
           <Text variant="display2" family="price" style={styles.etaTime}>{order.delivery_eta || '24 MINS'}</Text>

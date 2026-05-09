@@ -3,6 +3,7 @@ import { StyleSheet, View, ScrollView, Dimensions, Image, TouchableOpacity, Nati
 import { Text } from '../Themed';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '../useColorScheme';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 const { width } = Dimensions.get('window');
 
@@ -26,10 +27,11 @@ export function SpiceCarousel({ items, autoPlay = true, interval = 5000 }: Spice
   const scrollViewRef = useRef<ScrollView>(null);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (autoPlay && items.length > 1) {
+    if (autoPlay && !reducedMotion && items.length > 1) {
       timer = setInterval(() => {
         const nextIndex = (activeIndex + 1) % items.length;
         scrollViewRef.current?.scrollTo({ x: nextIndex * (width - 40), animated: true });
@@ -37,7 +39,7 @@ export function SpiceCarousel({ items, autoPlay = true, interval = 5000 }: Spice
       }, interval);
     }
     return () => clearInterval(timer);
-  }, [activeIndex, autoPlay, items.length]);
+  }, [activeIndex, autoPlay, items.length, interval, reducedMotion]);
 
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const slideSize = event.nativeEvent.layoutMeasurement.width;

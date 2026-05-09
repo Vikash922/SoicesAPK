@@ -10,6 +10,7 @@ import { AnimatedHeart } from '../ui/AnimatedHeart';
 import { useFlyingCart } from '../ui/FlyingCartProvider';
 import { MotiView } from 'moti';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { motion } from '@/components/ui/motion';
 
 interface SpiceProductCardProps {
   id: string;
@@ -61,9 +62,9 @@ export function SpiceProductCard({
 
   return (
     <MotiView
-      from={{ opacity: 0, translateY: 20 }}
+      from={reducedMotion ? { opacity: 1, translateY: 0 } : { opacity: 0, translateY: 12 }}
       animate={{ opacity: 1, translateY: 0 }}
-      transition={{ type: 'timing', duration: 400, delay: index * 100 }}
+      transition={{ type: 'timing', duration: reducedMotion ? motion.fast : motion.normal, delay: reducedMotion ? 0 : index * motion.stagger }}
       style={[styles.container, isList && styles.containerHorizontal, style]}
     >
       <Card style={{ flex: 1, padding: 0 }}>

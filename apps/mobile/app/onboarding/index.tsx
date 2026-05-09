@@ -18,25 +18,25 @@ const ONBOARDING_DATA = [
     id: '1',
     title: 'Discover Authentic Spices',
     subtitle: 'From farm to your kitchen, handpicked premium spices from global origins',
-    lottie: 'https://assets3.lottiefiles.com/packages/lf20_m6cuL6.json', 
+    lottie: require('@/assets/lottie/jar_pour.json'),
   },
   {
     id: '2',
     title: 'Every Spice, Every Blend',
     subtitle: '1000+ varieties from 50+ origin countries',
-    lottie: 'https://assets5.lottiefiles.com/private_files/lf30_8at8u6m9.json',
+    lottie: require('@/assets/lottie/spice_mill.json'),
   },
   {
     id: '3',
     title: 'Cook with Confidence',
     subtitle: 'AI-powered recipe matching and spice pairings',
-    lottie: 'https://assets10.lottiefiles.com/packages/lf20_S69rU9.json',
+    lottie: require('@/assets/lottie/cooking_pot.json'),
   },
 ];
 
-const SpiceAnimation = ({ uri, style }: { uri: string, style: any }) => {
+const SpiceAnimation = ({ source, style }: { source: any, style: any }) => {
   try {
-    return <LottieView source={{ uri }} autoPlay loop style={style} />;
+    return <LottieView source={source} autoPlay loop style={style} />;
   } catch (e) {
     return (
       <View style={[style, { backgroundColor: '#f5f5f5', borderRadius: 20, alignItems: 'center', justifyContent: 'center' }]}>
@@ -87,7 +87,7 @@ export default function OnboardingScreen() {
   const renderItem = ({ item }: { item: typeof ONBOARDING_DATA[0] }) => (
     <View style={[styles.slide, { width }]}>
       <Animated.View entering={FadeInRight.duration(800)} style={styles.lottieContainer}>
-        <SpiceAnimation uri={item.lottie} style={styles.lottie} />
+        <SpiceAnimation source={item.lottie} style={styles.lottie} />
       </Animated.View>
       <Animated.View entering={FadeInUp.delay(300).duration(800)} style={styles.textContainer}>
         <Text variant="h2" family="heading" style={styles.title}>{item.title}</Text>
@@ -97,7 +97,7 @@ export default function OnboardingScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colorScheme === 'dark' ? '#1A1A2E' : colors.background }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
           <Text variant="body2" family="heading" style={{ color: colors.saffron }}>SKIP</Text>

@@ -8,6 +8,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useProducts, useCategories } from '@/hooks/useProducts';
 import { SpiceShimmerLoader } from '@/components/spice/SpiceShimmerLoader';
+import { SpiceSearchBar } from '@/components/spice/SpiceSearchBar';
+import { SpiceEmptyState } from '@/components/spice/SpiceEmptyState';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -17,9 +20,36 @@ export default function ExploreScreen() {
   const colors = Colors[colorScheme];
   const [activeFilter, setActiveFilter] = useState('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'popular' | 'priceLow' | 'priceHigh' | 'rating'>('popular');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const RECENT_SEARCH_KEY = 'spicecart.recent_searches';
 
   const { data: allProducts, isLoading: isLoadingProducts } = useProducts();
   const { data: categories, isLoading: isLoadingCategories } = useCategories();
+  React.useEffect(() => {
+    AsyncStorage.getItem(RECENT_SEARCH_KEY).then((value) => {
+      if (value) setRecentSearches(JSON.parse(value));
+    });
+  }, []);
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const persistRecentSearch = async (query: string) => {
+    const normalized = query.trim();
+    if (!normalized) return;
+    const next = [normalized, ...recentSearches.filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(0, 6);
+    setRecentSearches(next);
+    await AsyncStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(next));
+  };
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      persistRecentSearch(searchQuery);
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   const filters = useMemo(() => {
     const baseFilters = ['All'];
@@ -31,13 +61,18 @@ export default function ExploreScreen() {
 
   const filteredProducts = useMemo(() => {
     if (!allProducts) return [];
-    if (activeFilter === 'All') return allProducts;
-    
-    const selectedCategory = categories?.find(c => c.name === activeFilter);
-    if (!selectedCategory) return allProducts;
-    
-    return allProducts.filter(p => p.category_id === selectedCategory.id);
-  }, [allProducts, activeFilter, categories]);
+    const searchLower = searchQuery.trim().toLowerCase();
+    const base = activeFilter === 'All'
+      ? allProducts
+      : allProducts.filter((p) => p.category_id === categories?.find((c) => c.name === activeFilter)?.id);
+    const searched = !searchLower ? base : base.filter((p) => p.name.toLowerCase().includes(searchLower));
+    return [...searched].sort((a, b) => {
+      if (sortBy === 'priceLow') return a.price - b.price;
+      if (sortBy === 'priceHigh') return b.price - a.price;
+      if (sortBy === 'rating') return (b.avg_rating || 0) - (a.avg_rating || 0);
+      return (b.popularity_score || 0) - (a.popularity_score || 0);
+    });
+  }, [allProducts, activeFilter, categories, searchQuery, sortBy]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -53,6 +88,19 @@ export default function ExploreScreen() {
       </View>
 
       {/* Filter Chips */}
+      <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+        <SpiceSearchBar placeholder="Search spices..." onSearch={handleSearch} voiceEnabled />
+      </View>
+      {recentSearches.length > 0 && !searchQuery.trim() && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentRow}>
+          {recentSearches.map((item) => (
+            <TouchableOpacity key={item} onPress={() => setSearchQuery(item)} style={[styles.recentChip, { borderColor: colors.card }]}>
+              <Ionicons name="time-outline" size={14} color={colors.tabIconDefault} />
+              <Text variant="caption" style={{ marginLeft: 6 }}>{item}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterList}>
           {filters.map((filter) => (
@@ -75,6 +123,24 @@ export default function ExploreScreen() {
           ))}
         </ScrollView>
       </View>
+      <View style={styles.sortRow}>
+        {[
+          { key: 'popular', label: 'Popular' },
+          { key: 'priceLow', label: 'Price ↑' },
+          { key: 'priceHigh', label: 'Price ↓' },
+          { key: 'rating', label: 'Top Rated' },
+        ].map((item) => (
+            <TouchableOpacity
+              key={item.key}
+            onPress={() => setSortBy(item.key as any)}
+            style={[styles.sortChip, { backgroundColor: sortBy === item.key ? colors.saffron : colors.card }]}
+          >
+            <Text variant="caption" family="heading" style={{ color: sortBy === item.key ? '#000' : colors.text }}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       {/* Product List */}
       {isLoadingProducts ? (
@@ -87,6 +153,16 @@ export default function ExploreScreen() {
             />
           ))}
         </View>
+      ) : filteredProducts.length === 0 ? (
+        <SpiceEmptyState
+          type="search"
+          message="No products matched your search/filter. Try another keyword."
+          action={() => {
+            setSearchQuery('');
+            setActiveFilter('All');
+          }}
+          actionLabel="RESET FILTERS"
+        />
       ) : (
         <FlatList
           data={filteredProducts}
@@ -141,6 +217,32 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 10,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 14,
+    paddingBottom: 8,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sortChip: {
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  recentRow: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  recentChip: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
   },
   productList: {
     paddingHorizontal: 10,

@@ -1082,3 +1082,93 @@ The spice-themed design language (heat meters, origin stories, recipe pairings) 
 
 *Document Version: 1.0 | Last Updated: 2025*
 
+
+---
+
+## 15. ⚡ Smooth Working Plan (Performance + Animation Smoothness)
+
+This section upgrades the blueprint into an implementation-ready smoothness plan for React Native + Expo.
+
+### A) Motion Guidelines (60 FPS first)
+
+- Keep critical transitions under **300ms** for taps and **450ms** for screen transitions.
+- Use **Reanimated worklets** for transform/opacity animations instead of JS-thread `Animated` when possible.
+- Prefer animating **opacity + transform** (`translate`, `scale`) over width/height/position to avoid layout thrash.
+- Use `withSpring` for tactile actions (like cart and wishlist), and `withTiming` for deterministic entrance/exit.
+- Cap parallel animated elements per screen section (avoid 10+ heavy loops visible at once).
+
+### B) Reduced Jank Strategy
+
+- Defer non-critical work until after navigation transition (e.g., network prefetch, analytics dispatch).
+- Use list virtualization everywhere (`FlashList`/optimized `FlatList`) for product and order-heavy screens.
+- Memoize cards and row renderers (`React.memo`, stable callbacks, stable keys).
+- Pre-size image containers and use lightweight placeholders to prevent content jumps.
+- Avoid heavy blur/drop-shadow stacking on low-end Android devices.
+
+### C) Animation Tokens (single source of truth)
+
+Create motion constants to standardize feel across app:
+
+- `motion.fast = 160`
+- `motion.normal = 240`
+- `motion.slow = 360`
+- `spring.snappy = { damping: 16, stiffness: 220 }`
+- `spring.gentle = { damping: 20, stiffness: 140 }`
+
+### D) Interaction Micro-Patterns
+
+- **Tap feedback:** scale to `0.97` then return.
+- **Card reveal:** fade + translateY 12→0 with 30ms stagger.
+- **Add to cart:** fly-to-cart path + counter bump.
+- **Wishlist toggle:** heart fill + haptic light impact.
+- **Errors:** shake + inline message + no blocking modal unless critical.
+
+### E) Runtime Checks
+
+- Validate smoothness on low-end Android profile with real image-heavy data.
+- Track dropped frames for Home, Explore, Product, Cart.
+- Keep initial Home Time-to-Interactive under 2.5s on mid-range devices.
+
+---
+
+## 16. 🗂️ File-by-File Implementation Details (Current Repo)
+
+Below is a practical ownership map so teams can improve "smooth working" quickly without ambiguity.
+
+### App Screens (Primary UX surfaces)
+
+- `apps/mobile/app/index.tsx` — entry composition and top-level user flow.
+- `apps/mobile/app/(tabs)/index.tsx` — Home feed sections and above-the-fold perceived performance.
+- `apps/mobile/app/(tabs)/explore.tsx` — product listing virtualization, filters, and scroll behavior.
+- `apps/mobile/app/product/[id].tsx` — media gallery, CTA animations, and related product transitions.
+- `apps/mobile/app/(tabs)/cart.tsx` — quantity updates, removal transitions, price recalculation feedback.
+- `apps/mobile/app/checkout/index.tsx` — form responsiveness and payment-step continuity.
+
+### Shared UX Components (Animation + visual consistency)
+
+- `apps/mobile/components/spice/SpiceCarousel.tsx` — hero and promo carousel motion quality.
+- `apps/mobile/components/spice/ThreeDCarousel.tsx` — advanced swipe interpolation and perspective tuning.
+- `apps/mobile/components/spice/SpiceProductCard.tsx` — card press animation, image loading state, wishlist/cart feedback.
+- `apps/mobile/components/spice/SpiceShimmerLoader.tsx` — skeleton strategy for perceived speed.
+- `packages/ui/src/FlyingCartProvider.tsx` — fly-to-cart orchestration and queueing.
+- `packages/ui/src/AnimatedNumber.tsx` — cart totals and dynamic values without jitter.
+
+### State + Data Flow (Smoothness-critical)
+
+- `apps/mobile/stores/useCartStore.ts` — optimistic cart updates and batched writes.
+- `apps/mobile/stores/useUIStore.ts` — global UI flags (modals, loading, toasts) and flicker prevention.
+- `apps/mobile/hooks/useProducts.ts` — pagination, prefetching, and cache hydration strategy.
+- `apps/mobile/hooks/useReducedMotion.ts` — accessibility-compliant motion scaling.
+
+### Media / Motion Assets
+
+- `assets/lottie/*.json` — keep Lottie sizes optimized; avoid extremely high layer counts.
+- `assets/images/*` — compress and serve device-appropriate dimensions.
+
+### Engineering Standards for Smoothness
+
+- Use a **single animation utility module** for timing/spring tokens.
+- Add performance checklist to PR template for all UI-heavy changes.
+- Every new list screen must include virtualization + placeholder skeletons.
+- Every new motion pattern must define reduced-motion behavior.
+

@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View, TouchableOpacity, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, TouchableOpacity, Platform, Modal, Pressable } from 'react-native';
 import { Text } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -7,6 +7,7 @@ import Colors from '@/constants/Colors';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import MapView, { Marker } from 'react-native-maps';
 
 export const HomeHeader = () => {
   const router = useRouter();
@@ -14,6 +15,28 @@ export const HomeHeader = () => {
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
+  const [locationLabel, setLocationLabel] = useState('Mumbai, MH 400001');
+  const [mapVisible, setMapVisible] = useState(false);
+  const [coords, setCoords] = useState({ latitude: 19.076, longitude: 72.8777 });
+
+  React.useEffect(() => {
+    // Prefetch high-frequency routes for near-instant transitions.
+    router.prefetch('/search/results');
+    router.prefetch('/notifications');
+  }, [router]);
+
+  const useCurrentLocation = () => {
+    if (!navigator?.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setCoords({ latitude, longitude });
+        setLocationLabel(`${latitude.toFixed(3)}, ${longitude.toFixed(3)}`);
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   return (
     <View style={styles.outerContainer}>
@@ -58,8 +81,9 @@ export const HomeHeader = () => {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.locationBar}
+            onPress={() => setMapVisible(true)}
             accessibilityLabel="Delivery location"
             accessibilityRole="button"
             accessibilityHint="Tap to change delivery address"
@@ -67,13 +91,41 @@ export const HomeHeader = () => {
             <View style={[styles.locationPill, { backgroundColor: isDark ? 'rgba(226, 183, 20, 0.1)' : 'rgba(226, 183, 20, 0.05)' }]}>
               <Ionicons name="location-outline" size={14} color={colors.saffron} />
               <Text variant="caption" style={styles.locationText}>
-                Delivering to <Text variant="caption" family="heading" style={{ color: colors.saffron }}>Mumbai, MH 400001</Text>
+                Delivering to <Text variant="caption" family="heading" style={{ color: colors.saffron }}>{locationLabel}</Text>
               </Text>
               <Ionicons name="chevron-down" size={12} color={colors.saffron} style={{ marginLeft: 4 }} />
             </View>
           </TouchableOpacity>
         </View>
       </BlurView>
+
+      <Modal visible={mapVisible} transparent animationType="slide" onRequestClose={() => setMapVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, { backgroundColor: isDark ? '#111827' : '#FFF8E7' }]}>
+            <Text variant="h3" family="heading">Set Delivery Location</Text>
+            <MapView
+              style={styles.map}
+              initialRegion={{ ...coords, latitudeDelta: 0.08, longitudeDelta: 0.08 }}
+              region={{ ...coords, latitudeDelta: 0.08, longitudeDelta: 0.08 }}
+              onPress={(e) => {
+                const { latitude, longitude } = e.nativeEvent.coordinate;
+                setCoords({ latitude, longitude });
+                setLocationLabel(`${latitude.toFixed(3)}, ${longitude.toFixed(3)}`);
+              }}
+            >
+              <Marker coordinate={coords} />
+            </MapView>
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.modalBtn, { backgroundColor: colors.card }]} onPress={useCurrentLocation}>
+                <Text>Use Current</Text>
+              </Pressable>
+              <Pressable style={[styles.modalBtn, { backgroundColor: colors.saffron }]} onPress={() => setMapVisible(false)}>
+                <Text style={{ color: '#000', fontWeight: '700' }}>Done</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -156,5 +208,31 @@ const styles = StyleSheet.create({
   locationText: { 
     marginLeft: 4, 
     fontSize: 12,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 14,
+    gap: 10,
+  },
+  map: {
+    width: '100%',
+    height: 280,
+    borderRadius: 14,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
   },
 });

@@ -14,7 +14,12 @@
       "backgroundColor": "#FFF8E7"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "SpiceCart uses location to show accurate delivery options near you.",
+        "NSMicrophoneUsageDescription": "SpiceCart uses your microphone for voice-based product search.",
+        "NSPhotoLibraryUsageDescription": "SpiceCart uses photo library access for profile and support uploads."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +27,13 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "RECORD_AUDIO",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO"
+      ]
     },
     "web": {
       "bundler": "metro",

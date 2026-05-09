@@ -189,7 +189,7 @@ export default function CartScreen() {
     return (
       <View style={[styles.container, styles.emptyContainer, { backgroundColor: colors.background }]}>
         <LottieView 
-          source={{ uri: 'https://raw.githubusercontent.com/airbnb/lottie-web/master/demo/gears/data.json' }} 
+          source={require('@/assets/lottie/empty_jar.json')}
           autoPlay 
           loop 
           style={styles.emptyLottie} 
@@ -332,7 +332,7 @@ export default function CartScreen() {
       {showConfetti && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <LottieView 
-            source={{ uri: 'https://raw.githubusercontent.com/spemer/lottie-animations-json/master/check_mark.json' }} 
+            source={require('@/assets/lottie/spice_confetti.json')}
             autoPlay 
             loop={false} 
             style={styles.confetti} 

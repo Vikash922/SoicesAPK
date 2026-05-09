@@ -10,6 +10,8 @@ import Animated, {
   interpolate,
   Extrapolate
 } from 'react-native-reanimated';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { motion, spring } from './motion';
 
 interface AnimatedHeartProps {
   isLiked: boolean;
@@ -26,21 +28,27 @@ export function AnimatedHeart({
   activeColor = '#C41E3A', 
   inactiveColor = '#A0A0B0' 
 }: AnimatedHeartProps) {
+  const reducedMotion = useReducedMotion();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0);
 
   useEffect(() => {
     if (isLiked) {
+      if (reducedMotion) {
+        scale.value = withTiming(1, { duration: motion.fast });
+        opacity.value = 0;
+        return;
+      }
       scale.value = withSequence(
-        withSpring(1.5),
-        withSpring(1)
+        withSpring(1.25, spring.snappy),
+        withSpring(1, spring.gentle)
       );
       opacity.value = withSequence(
-        withTiming(1, { duration: 200 }),
-        withTiming(0, { duration: 500 })
+        withTiming(1, { duration: motion.fast }),
+        withTiming(0, { duration: motion.normal })
       );
     }
-  }, [isLiked]);
+  }, [isLiked, reducedMotion]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
