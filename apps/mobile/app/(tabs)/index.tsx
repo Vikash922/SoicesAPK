@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, Image, TouchableOpacity, Dimensions } from 'react-native';
 import { Text } from '@/components/Themed';
 import { useRouter } from 'expo-router';
@@ -45,6 +45,12 @@ export default function HomeScreen() {
 
   const { data: trendingProducts, isLoading: isLoadingTrending } = useTrendingProducts();
   const { data: categories, isLoading: isLoadingCategories } = useCategories();
+
+  useEffect(() => {
+    router.prefetch('/explore');
+    router.prefetch('/search/results');
+    router.prefetch('/(tabs)/cart');
+  }, [router]);
 
   const scrollY = useSharedValue(0);
   const refreshProgress = useSharedValue(0);

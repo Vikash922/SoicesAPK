@@ -9,6 +9,7 @@ import {
   TextInput,
   Platform
 } from 'react-native';
+import { AccessibilityInfo } from 'react-native';
 import { Text } from '@/components/Themed';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -101,7 +102,13 @@ function CartItemRow({
           <View style={styles.itemInfo}>
             <View style={styles.itemHeader}>
               <Text variant="body1" family="heading" numberOfLines={1} style={styles.itemName}>{item.name}</Text>
-              <TouchableOpacity onPress={() => onRemove(item.id)}>
+              <TouchableOpacity
+                onPress={() => {
+                  onRemove(item.id);
+                  AccessibilityInfo.announceForAccessibility(`${item.name} removed from cart`);
+                }}
+                accessibilityLabel={`Remove ${item.name} from cart`}
+              >
                 <Ionicons name="close" size={20} color={colors.tabIconDefault} />
               </TouchableOpacity>
             </View>
@@ -175,21 +182,26 @@ export default function CartScreen() {
     if (couponInput.toUpperCase() === 'SPICE20') {
       applyCoupon('SPICE20');
       setShowConfetti(true);
+      AccessibilityInfo.announceForAccessibility('Coupon applied successfully');
       setTimeout(() => setShowConfetti(false), 3000);
     } else {
       applyCoupon(couponInput);
+      AccessibilityInfo.announceForAccessibility('Coupon applied');
     }
     setCouponInput('');
   };
 
   const deliveryFee = subtotal() > 499 ? 0 : 49;
   const finalTotal = Math.round(total() + deliveryFee);
+  useEffect(() => {
+    AccessibilityInfo.announceForAccessibility(`Cart total updated. Rupees ${finalTotal}`);
+  }, [finalTotal]);
 
   if (items.length === 0) {
     return (
       <View style={[styles.container, styles.emptyContainer, { backgroundColor: colors.background }]}>
         <LottieView 
-          source={{ uri: 'https://raw.githubusercontent.com/airbnb/lottie-web/master/demo/gears/data.json' }} 
+          source={require('@/assets/lottie/empty_jar.json')}
           autoPlay 
           loop 
           style={styles.emptyLottie} 
@@ -332,7 +344,7 @@ export default function CartScreen() {
       {showConfetti && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <LottieView 
-            source={{ uri: 'https://raw.githubusercontent.com/spemer/lottie-animations-json/master/check_mark.json' }} 
+            source={require('@/assets/lottie/spice_confetti.json')}
             autoPlay 
             loop={false} 
             style={styles.confetti} 

@@ -26,6 +26,7 @@ export default function ProductDetailScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const [selectedVariant, setSelectedVariant] = React.useState('100g');
+  const [activeImageIndex, setActiveImageIndex] = React.useState(0);
 
   const { data: product, isLoading } = useProduct(id as string);
   const { data: reviews, isLoading: isLoadingReviews } = useReviews(id as string);
@@ -72,6 +73,12 @@ export default function ProductDetailScreen() {
 
   const images = product.images && product.images.length > 0 ? product.images : [product.image];
   const discount = product.original_price ? Math.round(((product.original_price - product.price) / product.original_price) * 100) : 0;
+
+  const ratingDistribution = [5,4,3,2,1].map((star) => {
+    if (!reviews || reviews.length === 0) return { star, percent: 0 };
+    const count = reviews.filter((r) => r.rating === star).length;
+    return { star, percent: Math.round((count / reviews.length) * 100) };
+  });
 
   const handleAddToCart = () => {
     addItem({
@@ -127,11 +134,24 @@ export default function ProductDetailScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Image Gallery */}
-        <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(e) => {
+            const index = Math.round(e.nativeEvent.contentOffset.x / width);
+            setActiveImageIndex(index);
+          }}
+        >
           {images.map((img, index) => (
             <Image key={index} source={{ uri: img }} style={styles.heroImage} />
           ))}
         </ScrollView>
+        <View style={styles.imageDots}>
+          {images.map((_, i) => (
+            <View key={i} style={[styles.dot, { backgroundColor: i === activeImageIndex ? colors.saffron : colors.tabIconDefault + '55' }]} />
+          ))}
+        </View>
 
         <View style={styles.content}>
           <View style={styles.badgeRow}>
@@ -299,8 +319,7 @@ export default function ProductDetailScreen() {
               </View>
               
               <View style={styles.ratingBars}>
-                {[5, 4, 3, 2, 1].map((star, i) => {
-                  const percent = product.review_count ? Math.random() * 100 : 0;
+                {ratingDistribution.map(({ star, percent }) => {
                   return (
                     <View key={star} style={styles.ratingBarRow}>
                       <Text variant="caption" style={styles.starText}>{star} <Ionicons name="star" size={10} /></Text>
@@ -368,6 +387,8 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   headerButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.8)', alignItems: 'center', justifyContent: 'center' },
   heroImage: { width: width, height: width, resizeMode: 'cover' },
+  imageDots: { flexDirection: 'row', justifyContent: 'center', marginTop: 10, gap: 6, backgroundColor: 'transparent' },
+  dot: { width: 8, height: 8, borderRadius: 4 },
   content: { padding: 24, borderTopLeftRadius: 30, borderTopRightRadius: 30, marginTop: -30 },
   badgeRow: { flexDirection: 'row', marginBottom: 16, backgroundColor: 'transparent' },
   badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },

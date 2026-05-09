@@ -23,7 +23,7 @@ import Animated, {
   FadeInDown,
   Layout
 } from 'react-native-reanimated';
-import { useOrder } from '@/hooks/useOrders';
+import { useOrder, useOrderTracking } from '@/hooks/useOrders';
 import { Card } from '@/components/ui/Card';
 import { BlurView } from 'expo-blur';
 import { SpiceMapView } from '@/components/spice/SpiceMapView';
@@ -91,6 +91,16 @@ export default function OrderTrackingScreen() {
   const isDark = colorScheme === 'dark';
 
   const { data: order, isLoading } = useOrder(id as string);
+  const { data: tracking } = useOrderTracking(id as string);
+  const storeLocation = tracking?.storeLocation || { latitude: 19.076, longitude: 72.8777 };
+  const destinationLocation = tracking?.destinationLocation || {
+    latitude: order?.delivery_latitude || 19.096,
+    longitude: order?.delivery_longitude || 72.905,
+  };
+  const currentLocation = tracking?.riderLocation || {
+    latitude: (storeLocation.latitude + destinationLocation.latitude) / 2,
+    longitude: (storeLocation.longitude + destinationLocation.longitude) / 2,
+  };
 
   const timelineSteps = useMemo(() => {
     if (!order) return [];
@@ -119,10 +129,14 @@ export default function OrderTrackingScreen() {
       />
 
       <View style={styles.mapWrapper}>
-        <SpiceMapView />
+        <SpiceMapView
+          storeLocation={storeLocation}
+          destinationLocation={destinationLocation}
+          currentLocation={currentLocation}
+        />
         <BlurView intensity={isDark ? 40 : 80} tint={isDark ? 'dark' : 'light'} style={styles.etaOverlay}>
           <Text variant="caption" family="badge" style={{ color: colors.saffron, letterSpacing: 2 }}>ESTIMATED ARRIVAL</Text>
-          <Text variant="display2" family="price" style={styles.etaTime}>{order.delivery_eta || '24 MINS'}</Text>
+          <Text variant="display2" family="price" style={styles.etaTime}>{tracking?.etaMinutes ? `${tracking.etaMinutes} MINS` : (order.delivery_eta || '24 MINS')}</Text>
         </BlurView>
       </View>
 

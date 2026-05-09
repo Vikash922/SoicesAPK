@@ -20,6 +20,18 @@ export interface OrderItem {
   total_price: number;
 }
 
+export interface OrderTracking {
+  orderId: string;
+  status: string;
+  etaMinutes: number;
+  storeLocation: { latitude: number; longitude: number };
+  destinationLocation: { latitude: number; longitude: number };
+  riderLocation: { latitude: number; longitude: number };
+  timeline: Array<{ id: string; at: string | null; done: boolean }>;
+}
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+
 export const orderApi = {
   async getOrders() {
     const { data, error } = await supabase
@@ -74,5 +86,45 @@ export const orderApi = {
     if (itemsError) throw itemsError;
 
     return order;
+  },
+
+  async getOrderTracking(id: string): Promise<OrderTracking | null> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
+    try {
+      const response = await fetch(`${API_BASE_URL}/v1/orders/${id}/tracking`, {
+        signal: controller.signal,
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      // Fallback to direct Supabase read for production setups
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, status, estimated_delivery, address_snapshot')
+        .eq('id', id)
+        .single();
+      if (error || !data) return null;
+      const address = (data as any).address_snapshot || {};
+      const destination = {
+        latitude: Number(address.latitude || 19.096),
+        longitude: Number(address.longitude || 72.905),
+      };
+      const store = { latitude: 19.076, longitude: 72.8777 };
+      return {
+        orderId: id,
+        status: data.status || 'pending',
+        etaMinutes: 25,
+        storeLocation: store,
+        destinationLocation: destination,
+        riderLocation: {
+          latitude: (store.latitude + destination.latitude) / 2,
+          longitude: (store.longitude + destination.longitude) / 2,
+        },
+        timeline: [],
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 };
