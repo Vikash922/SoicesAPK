@@ -89,12 +89,18 @@ export const orderApi = {
   },
 
   async getOrderTracking(id: string): Promise<OrderTracking | null> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
     try {
-      const response = await fetch(`${API_BASE_URL}/v1/orders/${id}/tracking`);
+      const response = await fetch(`${API_BASE_URL}/v1/orders/${id}/tracking`, {
+        signal: controller.signal,
+      });
       if (!response.ok) return null;
       return await response.json();
     } catch {
       return null;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 };
