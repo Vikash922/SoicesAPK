@@ -20,6 +20,18 @@ export interface OrderItem {
   total_price: number;
 }
 
+export interface OrderTracking {
+  orderId: string;
+  status: string;
+  etaMinutes: number;
+  storeLocation: { latitude: number; longitude: number };
+  destinationLocation: { latitude: number; longitude: number };
+  riderLocation: { latitude: number; longitude: number };
+  timeline: Array<{ id: string; at: string | null; done: boolean }>;
+}
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+
 export const orderApi = {
   async getOrders() {
     const { data, error } = await supabase
@@ -74,5 +86,15 @@ export const orderApi = {
     if (itemsError) throw itemsError;
 
     return order;
+  },
+
+  async getOrderTracking(id: string): Promise<OrderTracking | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/v1/orders/${id}/tracking`);
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
+    }
   }
 };

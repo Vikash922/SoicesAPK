@@ -33,3 +33,12 @@ export const useCreateOrder = () => {
     },
   });
 };
+
+export const useOrderTracking = (id: string) => {
+  return useQuery({
+    queryKey: ['orders', id, 'tracking'],
+    queryFn: () => orderApi.getOrderTracking(id),
+    staleTime: STALE_TIMES.FLASH_DEALS,
+    enabled: !!id,
+  });
+};
