@@ -29,6 +29,17 @@ app.get('/v1/orders/:id/tracking', async (req) => {
   };
 });
 
+app.get('/v1/products', async () => ({ items: [], page: 1, total: 0 }));
+app.get('/v1/products/:id', async (req) => ({ id: (req.params as any).id }));
+app.get('/v1/categories', async () => ({ items: [] }));
+app.get('/v1/cart', async () => ({ items: [], couponCode: null, discount: 0 }));
+app.post('/v1/cart/items', async () => ({ ok: true }));
+app.patch('/v1/cart/items/:id', async () => ({ ok: true }));
+app.delete('/v1/cart/items/:id', async () => ({ ok: true }));
+app.get('/v1/orders', async () => ({ items: [] }));
+app.get('/v1/orders/:id', async (req) => ({ id: (req.params as any).id }));
+app.post('/v1/orders', async () => ({ ok: true, orderId: 'SPC-DEMO-1' }));
+
 const start = async () => {
   const port = Number(process.env.PORT || 3001);
   await app.listen({ port, host: '0.0.0.0' });
